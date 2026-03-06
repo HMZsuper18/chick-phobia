@@ -233,14 +233,10 @@ function App() {
 
   const highlightMatch = (name, query) => {
     const parts = name.split(new RegExp(`(${query})`, 'giu'))
-    return (
-      <span style={{direction: 'ltr', unicodeBidi: 'embed', display: 'inline-block'}}>
-        {parts.map((part, i) => 
-          part.toLowerCase() === query.toLowerCase() 
-          ? <span key={i} className="highlight">{part}</span> 
-          : part
-        )}
-      </span>
+    return parts.map((part, i) => 
+      part.toLowerCase() === query.toLowerCase() 
+      ? <span key={i} className="highlight">{part}</span> 
+      : part
     )
   }
 
@@ -287,6 +283,7 @@ function App() {
       {isFriendsOpen && <div className="overlay overlay-friends" style={{zIndex: 2500}} onClick={() => setIsFriendsOpen(false)}></div>}
 
       <div className={`sidebar ${isSettingsOpen ? 'open' : ''}`}>
+        <button className="close-btn sidebar-close-btn" onClick={() => setIsSettingsOpen(false)}>×</button>
         <div className="sidebar-header">
           {user?.photoURL && <img src={user.photoURL} className="avatar-large" alt="User" referrerPolicy="no-referrer" />}
           <h2 className="nickname-large">{nickname}</h2>
@@ -379,7 +376,7 @@ function App() {
                     <img src={usersData[f]?.photo} className="user-avatar" referrerPolicy="no-referrer" />
                     <span className={`status-dot ${usersData[f]?.online ? 'online' : 'offline'}`}></span>
                   </div>
-                  <span>{f}</span>
+                  <span dir="ltr" style={{unicodeBidi: 'embed'}}>{f}</span>
                 </div>
               </div>
             )) : activeTab === 'friends' && <p className="empty-txt">{language === 'ar' ? 'لا يوجد أصدقاء' : 'No friends'}</p>)}
@@ -388,7 +385,7 @@ function App() {
               <div key={r} className="item">
                 <div className="item-info" style={{flexDirection: language === 'ar' ? 'row-reverse' : 'row'}}>
                   <img src={usersData[r]?.photo} className="user-avatar" referrerPolicy="no-referrer" />
-                  <span>{r}</span>
+                  <span dir="ltr" style={{unicodeBidi: 'embed'}}>{r}</span>
                 </div>
                 <button onClick={() => acceptFriend(r)} className="acc-btn">{language === 'ar' ? 'قبول' : 'Accept'}</button>
               </div>
@@ -401,9 +398,9 @@ function App() {
                 {suggestions.length > 0 && (
                   <div className="autosuggest-box">
                     {suggestions.map(s => (
-                      <div key={s} className="suggest-item" onClick={() => sendRequest(s)}>
+                      <div key={s} className="suggest-item" style={{flexDirection: language === 'ar' ? 'row-reverse' : 'row'}} onClick={() => sendRequest(s)}>
                         <img src={usersData[s]?.photo} className="user-avatar-small" referrerPolicy="no-referrer" />
-                        {highlightMatch(s, searchUser)}
+                        <span dir="ltr" style={{unicodeBidi: 'embed'}}>{highlightMatch(s, searchUser)}</span>
                       </div>
                     ))}
                   </div>
