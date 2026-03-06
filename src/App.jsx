@@ -4,7 +4,7 @@ import { initializeApp } from "firebase/app"
 import { 
   getFirestore, doc, setDoc, getDoc, onSnapshot, updateDoc, 
   deleteField, collection, getDocs, deleteDoc, 
-  query, orderBy, limit, addDoc, serverTimestamp 
+  query, orderBy, limit, addDoc, serverTimestamp, startAfter
 } from "firebase/firestore"
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "firebase/auth"
 
@@ -25,6 +25,7 @@ const auth = getAuth(app);
 const provider = new GoogleAuthProvider();
 
 function App() {
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
   const [user, setUser] = React.useState(undefined)
   const [nickname, setNickname] = React.useState('')
   const [isRegistered, setIsRegistered] = React.useState(false)
@@ -44,7 +45,9 @@ function App() {
   const [selectedFriend, setSelectedFriend] = React.useState(null)
   const [messages, setMessages] = React.useState([])
   const [msgInput, setMsgInput] = React.useState('')
+  const [firstDoc, setFirstDoc] = React.useState(null)
   const scrollRef = React.useRef()
+  const listRef = React.useRef()
 
   const CLOUD_NAME = "dbgqro4d3";
   const UPLOAD_PRESET = "chick phobia"; 
@@ -103,13 +106,34 @@ function App() {
   React.useEffect(() => {
     if (!selectedFriend || !nickname) return
     const chatId = [nickname, selectedFriend].sort().join('_')
-    const q = query(collection(db, "chats", chatId, "messages"), orderBy("createdAt", "asc"), limit(50))
+    const q = query(collection(db, "chats", chatId, "messages"), orderBy("createdAt", "desc"), limit(50))
     const unsub = onSnapshot(q, (snap) => {
-      setMessages(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+      const fetched = snap.docs.map(d => ({ id: d.id, ...d.data() })).reverse()
+      setMessages(fetched)
+      setFirstDoc(snap.docs[snap.docs.length - 1])
       setTimeout(() => scrollRef.current?.scrollIntoView({ behavior: "smooth" }), 100)
     })
     return () => unsub()
   }, [selectedFriend, nickname])
+
+  const handleScroll = () => {
+    if (!listRef.current) return
+    const { scrollTop } = listRef.current
+    if (scrollTop === 0 && firstDoc) {
+      loadOlder()
+    }
+  }
+
+  const loadOlder = async () => {
+    const chatId = [nickname, selectedFriend].sort().join('_')
+    const q = query(collection(db, "chats", chatId, "messages"), orderBy("createdAt", "desc"), startAfter(firstDoc), limit(50))
+    const snap = await getDocs(q)
+    if (!snap.empty) {
+      const older = snap.docs.map(d => ({ id: d.id, ...d.data() })).reverse()
+      setMessages(prev => [...older, ...prev])
+      setFirstDoc(snap.docs[snap.docs.length - 1])
+    }
+  }
 
   const listenToData = (id) => {
     onSnapshot(doc(db, "users", id), (docSnap) => {
@@ -255,7 +279,7 @@ function App() {
           <img src={logo} className="login-logo" alt="Logo" />
           <h1>Chick Phobia</h1>
           <button onClick={() => signInWithPopup(auth, provider)} className="mybutton" style={{display:'flex', alignItems:'center', justifyContent:'center', gap:'10px'}}>
-            <img src="https://cdn-icons-png.flaticon.com/512/300/300221.png" width="20" alt="G"/>
+             <span className="material-symbols-outlined" style={{color: '#000'}}>account_circle</span>
             Continue with Google
           </button>
         </div>
@@ -278,12 +302,14 @@ function App() {
   }
 
   return (
-    <div className={`app-container ${language === 'ar' ? 'rtl-mode' : ''} ${isSettingsOpen ? 'settings-active' : ''}`}>
+    <div className={`app-container ${language === 'ar' ? 'rtl-mode' : ''} ${isSettingsOpen ? 'settings-active' : ''} ${isIOS ? 'ios-fix' : ''}`}>
       {isSettingsOpen && <div className="overlay overlay-settings" onClick={() => setIsSettingsOpen(false)}></div>}
       {isFriendsOpen && <div className="overlay overlay-friends" style={{zIndex: 2500}} onClick={() => setIsFriendsOpen(false)}></div>}
-
+      
       <div className={`sidebar ${isSettingsOpen ? 'open' : ''}`}>
-        <button className="close-btn sidebar-close-btn" onClick={() => setIsSettingsOpen(false)}>×</button>
+        <button className="close-btn sidebar-close-btn" onClick={() => setIsSettingsOpen(false)}>
+           <span className="material-symbols-outlined">close</span>
+        </button>
         <div className="sidebar-header">
           {user?.photoURL && <img src={user.photoURL} className="avatar-large" alt="User" referrerPolicy="no-referrer" />}
           <h2 className="nickname-large">{nickname}</h2>
@@ -301,11 +327,15 @@ function App() {
             <span className="lang-text">EN</span>
           </div>
         </div>
-        <button className="logout-btn-sidebar" onClick={() => { updateDoc(doc(db, "users", nickname), {online: false}); signOut(auth); }}>{language === 'ar' ? 'تسجيل الخروج' : 'Logout'}</button>
+        <button className="logout-btn-sidebar" onClick={() => { updateDoc(doc(db, "users", nickname), {online: false}); signOut(auth); }}>
+          {language === 'ar' ? 'تسجيل الخروج' : 'Logout'}
+        </button>
       </div>
 
       <div className="top-bar">
-        <button className="menu-btn" onClick={() => setIsFriendsOpen(true)}>☰</button>
+        <button className="menu-btn" onClick={() => setIsFriendsOpen(true)}>
+          <span className="material-symbols-outlined">menu</span>
+        </button>
         <div className="user-info-top" onClick={() => setIsSettingsOpen(prev => !prev)}>
           <div style={{position: 'relative'}}>
             <img src={user?.photoURL} className="user-avatar" alt="User" referrerPolicy="no-referrer" />
@@ -321,7 +351,7 @@ function App() {
         <div className="chat-section">
           {selectedFriend ? (
             <div className="chat-container">
-              <div className="messages-list">
+              <div className="messages-list" ref={listRef} onScroll={handleScroll}>
                 {messages.map((m, index) => {
                   const isMe = m.sender === nickname;
                   const senderPhoto = isMe ? user?.photoURL : usersData[m.sender]?.photo;
@@ -354,11 +384,17 @@ function App() {
               </div>
               <form className="chat-input-area" onSubmit={sendMessage}>
                 <input type="file" id="img-upload" style={{display: 'none'}} accept="image/*" onChange={(e) => handleMediaUpload(e.target.files[0])} />
-                <label htmlFor="img-upload" className="media-label"><img src="https://cdn-icons-png.flaticon.com/512/8191/8191581.png" width="24" style={{filter: 'invert(1)'}} alt="img" /></label>
+                <label htmlFor="img-upload" className="media-label">
+                  <span className="material-symbols-outlined">image</span>
+                </label>
                 <input type="file" id="vid-upload" style={{display: 'none'}} accept="video/*" onChange={(e) => handleMediaUpload(e.target.files[0])} />
-                <label htmlFor="vid-upload" className="media-label"><img src="https://cdn-icons-png.flaticon.com/512/1179/1179069.png" width="24" style={{filter: 'invert(1)'}} alt="vid" /></label>
+                <label htmlFor="vid-upload" className="media-label">
+                  <span className="material-symbols-outlined">videocam</span>
+                </label>
                 <input className="myinput" value={msgInput} onChange={e => setMsgInput(e.target.value)} placeholder={language === 'ar' ? 'اكتب رسالة...' : 'Type...'} />
-                <button type="submit" className="acc-btn">{language === 'ar' ? 'إرسال' : 'Send'}</button>
+                <button type="submit" className="acc-btn">
+                  <span className="material-symbols-outlined" style={{fontSize: '20px'}}>send</span>
+                </button>
               </form>
             </div>
           ) : (
@@ -367,7 +403,9 @@ function App() {
         </div>
 
         <div className={`friends-section ${isFriendsOpen ? 'drawer-open' : ''}`}>
-          <button className="close-btn" onClick={() => setIsFriendsOpen(false)}>×</button>
+          <button className="close-btn" onClick={() => setIsFriendsOpen(false)}>
+            <span className="material-symbols-outlined">close</span>
+          </button>
           <div className="list-container">
             {activeTab === 'friends' && (friends.length > 0 ? friends.map(f => (
               <div key={f} className="item" onClick={() => { setSelectedFriend(f); setIsFriendsOpen(false); }}>
@@ -410,13 +448,13 @@ function App() {
           </div>
           <div className="tab-icons">
             <div className="tab-icon-wrapper">
-              <img src="https://cdn-icons-png.flaticon.com/512/2583/2583118.png" onClick={() => setActiveTab('friends')} className={activeTab === 'friends' ? 'active' : ''} />
+               <span className={`material-symbols-outlined tab-icon ${activeTab === 'friends' ? 'active' : ''}`} onClick={() => setActiveTab('friends')}>group</span>
             </div>
             <div className="tab-icon-wrapper">
-              <img src="https://cdn-icons-png.flaticon.com/512/1182/1182761.png" onClick={() => setActiveTab('requests')} className={activeTab === 'requests' ? 'active' : ''} />
+              <span className={`material-symbols-outlined tab-icon ${activeTab === 'requests' ? 'active' : ''}`} onClick={() => setActiveTab('requests')}>person_add</span>
               {requests.length > 0 && <span className="notif-badge"></span>}
             </div>
-            <img src="https://cdn-icons-png.flaticon.com/512/748/748113.png" onClick={() => setActiveTab('add')} className={activeTab === 'add' ? 'active' : ''} />
+            <span className={`material-symbols-outlined tab-icon ${activeTab === 'add' ? 'active' : ''}`} onClick={() => setActiveTab('add')}>person_search</span>
           </div>
         </div>
       </div>
