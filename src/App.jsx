@@ -233,10 +233,14 @@ function App() {
 
   const highlightMatch = (name, query) => {
     const parts = name.split(new RegExp(`(${query})`, 'giu'))
-    return parts.map((part, i) => 
-      part.toLowerCase() === query.toLowerCase() 
-      ? <span key={i} className="highlight">{part}</span> 
-      : part
+    return (
+      <span style={{direction: 'ltr', unicodeBidi: 'embed', display: 'inline-block'}}>
+        {parts.map((part, i) => 
+          part.toLowerCase() === query.toLowerCase() 
+          ? <span key={i} className="highlight">{part}</span> 
+          : part
+        )}
+      </span>
     )
   }
 
@@ -370,8 +374,8 @@ function App() {
           <div className="list-container">
             {activeTab === 'friends' && (friends.length > 0 ? friends.map(f => (
               <div key={f} className="item" onClick={() => { setSelectedFriend(f); setIsFriendsOpen(false); }}>
-                <div className="item-info">
-                  <div style={{position: 'relative'}}>
+                <div className="item-info" style={{flexDirection: language === 'ar' ? 'row-reverse' : 'row'}}>
+                  <div style={{position: 'relative', flexShrink: 0}}>
                     <img src={usersData[f]?.photo} className="user-avatar" referrerPolicy="no-referrer" />
                     <span className={`status-dot ${usersData[f]?.online ? 'online' : 'offline'}`}></span>
                   </div>
@@ -382,7 +386,7 @@ function App() {
 
             {activeTab === 'requests' && (requests.length > 0 ? requests.map(r => (
               <div key={r} className="item">
-                <div className="item-info">
+                <div className="item-info" style={{flexDirection: language === 'ar' ? 'row-reverse' : 'row'}}>
                   <img src={usersData[r]?.photo} className="user-avatar" referrerPolicy="no-referrer" />
                   <span>{r}</span>
                 </div>
