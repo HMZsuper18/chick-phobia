@@ -25,11 +25,12 @@ const auth = getAuth(app);
 const provider = new GoogleAuthProvider();
 
 function App() {
-  const [user, setUser] = React.useState(null)
+  const [user, setUser] = React.useState(undefined)
   const [nickname, setNickname] = React.useState('')
   const [isRegistered, setIsRegistered] = React.useState(false)
   const [isSettingsOpen, setIsSettingsOpen] = React.useState(false)
-  const [language, setLanguage] = React.useState('ar')
+  const [isFriendsOpen, setIsFriendsOpen] = React.useState(false)
+  const [language, setLanguage] = React.useState(localStorage.getItem('appLang') || 'ar')
   const [newNickname, setNewNickname] = React.useState('')
   const [friends, setFriends] = React.useState([])
   const [requests, setRequests] = React.useState([])
@@ -40,7 +41,6 @@ function App() {
   const [suggestions, setSuggestions] = React.useState([])
   const [allUsers, setAllUsers] = React.useState([])
   const [usersData, setUsersData] = React.useState({})
-  
   const [selectedFriend, setSelectedFriend] = React.useState(null)
   const [messages, setMessages] = React.useState([])
   const [msgInput, setMsgInput] = React.useState('')
@@ -60,8 +60,12 @@ function App() {
             await updateDoc(doc(db, "users", found.id), { photo: u.photoURL })
           }
           setNickname(found.id); setNewNickname(found.id); setIsRegistered(true); listenToData(found.id)
+        } else {
+          setIsRegistered(false)
         }
-      } else { setUser(null); setIsRegistered(false); setNickname('') }
+      } else { 
+        setUser(null); setIsRegistered(false); setNickname('') 
+      }
     })
     return () => unsub()
   }, [])
@@ -117,6 +121,12 @@ function App() {
       }
     })
   }
+
+  const toggleLanguage = () => {
+    const newLang = language === 'ar' ? 'en' : 'ar';
+    setLanguage(newLang);
+    localStorage.setItem('appLang', newLang);
+  };
 
   const handleUpdateNickname = async () => {
     if (!newNickname || newNickname === nickname) return
@@ -230,34 +240,47 @@ function App() {
     )
   }
 
-  if (!user) return (
-    <div className="all">
-      <div className="login-card">
-        <img src={logo} className="login-logo" alt="Logo" />
-        <h1>Chick Phobia</h1>
-        <button onClick={() => signInWithPopup(auth, provider)} className="mybutton" style={{display:'flex', alignItems:'center', justifyContent:'center', gap:'10px'}}>
-          <img src="https://cdn-icons-png.flaticon.com/512/300/300221.png" width="20" alt="G"/>
-          Continue with Google
-        </button>
+  if (user === undefined) {
+    return (
+      <div className="all">
+        <img src={logo} className="login-logo pulse" alt="Loading" />
       </div>
-    </div>
-  )
+    )
+  }
 
-  if (!isRegistered) return (
-    <div className="all">
-      <div className="login-card">
-        <h2>{language === 'ar' ? 'اختر اسم المستخدم' : 'Choose Nickname'}</h2>
-        <form onSubmit={handleSetNickname}>
-          <input type="text" className="myinput" value={nickname} onChange={e => setNickname(e.target.value)} />
-          <button type="submit" className="mybutton">{language === 'ar' ? 'ابدأ' : 'Start'}</button>
-        </form>
+  if (user === null) {
+    return (
+      <div className="all">
+        <div className="login-card">
+          <img src={logo} className="login-logo" alt="Logo" />
+          <h1>Chick Phobia</h1>
+          <button onClick={() => signInWithPopup(auth, provider)} className="mybutton" style={{display:'flex', alignItems:'center', justifyContent:'center', gap:'10px'}}>
+            <img src="https://cdn-icons-png.flaticon.com/512/300/300221.png" width="20" alt="G"/>
+            Continue with Google
+          </button>
+        </div>
       </div>
-    </div>
-  )
+    )
+  }
+
+  if (!isRegistered) {
+    return (
+      <div className="all">
+        <div className="login-card">
+          <h2>{language === 'ar' ? 'اختر اسم المستخدم' : 'Choose Nickname'}</h2>
+          <form onSubmit={handleSetNickname}>
+            <input type="text" className="myinput" value={nickname} onChange={e => setNickname(e.target.value)} />
+            <button type="submit" className="mybutton">{language === 'ar' ? 'ابدأ' : 'Start'}</button>
+          </form>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className={`app-container ${language === 'ar' ? 'rtl-mode' : ''} ${isSettingsOpen ? 'settings-active' : ''}`}>
-      {isSettingsOpen && <div className="overlay" onClick={() => setIsSettingsOpen(false)}></div>}
+      {isSettingsOpen && <div className="overlay overlay-settings" onClick={() => setIsSettingsOpen(false)}></div>}
+      {isFriendsOpen && <div className="overlay overlay-friends" style={{zIndex: 2500}} onClick={() => setIsFriendsOpen(false)}></div>}
 
       <div className={`sidebar ${isSettingsOpen ? 'open' : ''}`}>
         <div className="sidebar-header">
@@ -271,7 +294,7 @@ function App() {
         </div>
         <div className="setting-box">
           <label>{language === 'ar' ? 'اللغة:' : 'Language:'}</label>
-          <div className="lang-switch" onClick={() => setLanguage(language === 'ar' ? 'en' : 'ar')}>
+          <div className="lang-switch" onClick={toggleLanguage}>
             <div className={`switch-knob ${language === 'en' ? 'move-to-en' : 'move-to-ar'}`}></div>
             <span className="lang-text">AR</span>
             <span className="lang-text">EN</span>
@@ -281,7 +304,8 @@ function App() {
       </div>
 
       <div className="top-bar">
-        <div className="user-info-top" onClick={() => setIsSettingsOpen(true)}>
+        <button className="menu-btn" onClick={() => setIsFriendsOpen(true)}>☰</button>
+        <div className="user-info-top" onClick={() => setIsSettingsOpen(prev => !prev)}>
           <div style={{position: 'relative'}}>
             <img src={user?.photoURL} className="user-avatar" alt="User" referrerPolicy="no-referrer" />
             <span className="status-dot online"></span>
@@ -289,37 +313,37 @@ function App() {
           <span className="user-nickname-top">{nickname}</span>
         </div>
         <h2 className="welcome-msg">{language === 'ar' ? `أهلاً بك، ${nickname}` : `Welcome, ${nickname}`}</h2>
-        <div style={{width: '60px'}}></div>
+        <div className="top-bar-spacer"></div>
       </div>
 
       <div className="main-layout">
         <div className="chat-section">
           {selectedFriend ? (
-            <div className="chat-container" style={{display:'flex', flexDirection:'column', width:'100%', height:'100%'}}>
-              <div className="messages-list" style={{flex:1, overflowY:'auto', padding:'20px', display:'flex', flexDirection:'column', gap:'4px'}}>
+            <div className="chat-container">
+              <div className="messages-list">
                 {messages.map((m, index) => {
                   const isMe = m.sender === nickname;
                   const senderPhoto = isMe ? user?.photoURL : usersData[m.sender]?.photo;
                   const isSameAsPrevious = index > 0 && messages[index - 1].sender === m.sender;
                   return (
-                    <div key={m.id} className={`msg-wrapper ${isMe ? 'sent' : 'received'}`} 
-                         style={{ display:'flex', width:'100%', justifyContent: isMe ? 'flex-end' : 'flex-start', alignItems: 'flex-end', gap: '8px', marginTop: isSameAsPrevious ? '0px' : '15px' }}>
+                    <div key={m.id} className={`msg-wrapper ${isMe ? 'sent' : 'received'}${isSameAsPrevious ? ' consecutive' : ''}`} 
+                         style={{ marginTop: isSameAsPrevious ? '2px' : '15px' }}>
                       {!isMe && (
-                        <div style={{width: '30px'}}>
-                          {!isSameAsPrevious && <img src={senderPhoto} className="user-avatar" style={{width:'30px', height:'30px'}} referrerPolicy="no-referrer" />}
+                        <div className="msg-avatar-container">
+                          {!isSameAsPrevious && <img src={senderPhoto} className="user-avatar-chat" referrerPolicy="no-referrer" />}
                         </div>
                       )}
-                      <div style={{display:'flex', flexDirection:'column', alignItems: isMe ? 'flex-end' : 'flex-start'}}>
-                        {!isSameAsPrevious && <span style={{fontSize:'0.7rem', opacity:'0.6', marginBottom:'2px', marginInlineStart: '5px'}}>{m.sender}</span>}
-                        <div className="message" style={{ maxWidth:'250px', padding: (m.image || m.video) ? '5px' : '10px 15px', borderRadius:'15px', background: isMe ? '#61dafb' : 'rgba(255,255,255,0.1)', color: isMe ? '#000' : '#fff', borderBottomRightRadius: isMe ? '2px' : '15px', borderBottomLeftRadius: isMe ? '15px' : '2px' }}>
-                          {m.image && <img src={m.image} alt="sent" style={{maxWidth: '100%', borderRadius: '10px', display: 'block'}} />}
-                          {m.video && <video controls style={{maxWidth: '100%', borderRadius: '10px', display: 'block'}}><source src={m.video} type="video/mp4" /></video>}
+                      <div className="msg-content-wrapper">
+                        {!isSameAsPrevious && <span className="msg-sender-name">{m.sender}</span>}
+                        <div className="message">
+                          {m.image && <img src={m.image} alt="sent" className="msg-media" />}
+                          {m.video && <video controls className="msg-media"><source src={m.video} type="video/mp4" /></video>}
                           {m.text && m.text}
                         </div>
                       </div>
                       {isMe && (
-                        <div style={{width: '30px'}}>
-                          {!isSameAsPrevious && <img src={senderPhoto} className="user-avatar" style={{width:'30px', height:'30px'}} referrerPolicy="no-referrer" />}
+                        <div className="msg-avatar-container">
+                          {!isSameAsPrevious && <img src={senderPhoto} className="user-avatar-chat" referrerPolicy="no-referrer" />}
                         </div>
                       )}
                     </div>
@@ -327,11 +351,11 @@ function App() {
                 })}
                 <div ref={scrollRef}></div>
               </div>
-              <form className="chat-input-area" onSubmit={sendMessage} style={{padding:'20px', display:'flex', gap:'10px', borderTop:'1px solid rgba(255,255,255,0.1)', alignItems:'center'}}>
+              <form className="chat-input-area" onSubmit={sendMessage}>
                 <input type="file" id="img-upload" style={{display: 'none'}} accept="image/*" onChange={(e) => handleMediaUpload(e.target.files[0])} />
-                <label htmlFor="img-upload" style={{cursor: 'pointer', opacity: '0.7'}}><img src="https://cdn-icons-png.flaticon.com/512/8191/8191581.png" width="28" style={{filter: 'invert(1)'}} alt="upload-img" /></label>
+                <label htmlFor="img-upload" className="media-label"><img src="https://cdn-icons-png.flaticon.com/512/8191/8191581.png" width="24" style={{filter: 'invert(1)'}} alt="img" /></label>
                 <input type="file" id="vid-upload" style={{display: 'none'}} accept="video/*" onChange={(e) => handleMediaUpload(e.target.files[0])} />
-                <label htmlFor="vid-upload" style={{cursor: 'pointer', opacity: '0.7'}}><img src="https://cdn-icons-png.flaticon.com/512/1179/1179069.png" width="28" style={{filter: 'invert(1)'}} alt="upload-vid" /></label>
+                <label htmlFor="vid-upload" className="media-label"><img src="https://cdn-icons-png.flaticon.com/512/1179/1179069.png" width="24" style={{filter: 'invert(1)'}} alt="vid" /></label>
                 <input className="myinput" value={msgInput} onChange={e => setMsgInput(e.target.value)} placeholder={language === 'ar' ? 'اكتب رسالة...' : 'Type...'} />
                 <button type="submit" className="acc-btn">{language === 'ar' ? 'إرسال' : 'Send'}</button>
               </form>
@@ -340,11 +364,13 @@ function App() {
             <div className="chat-placeholder">{language === 'ar' ? 'اختر صديقاً' : 'Select a friend'}</div>
           )}
         </div>
-        <div className="friends-section">
+
+        <div className={`friends-section ${isFriendsOpen ? 'drawer-open' : ''}`}>
+          <button className="close-btn" onClick={() => setIsFriendsOpen(false)}>×</button>
           <div className="list-container">
             {activeTab === 'friends' && (friends.length > 0 ? friends.map(f => (
-              <div key={f} className="item" onClick={() => setSelectedFriend(f)} style={{cursor:'pointer', position: 'relative'}}>
-                <div style={{display: 'flex', alignItems: 'center', gap: '10px'}}>
+              <div key={f} className="item" onClick={() => { setSelectedFriend(f); setIsFriendsOpen(false); }}>
+                <div className="item-info">
                   <div style={{position: 'relative'}}>
                     <img src={usersData[f]?.photo} className="user-avatar" referrerPolicy="no-referrer" />
                     <span className={`status-dot ${usersData[f]?.online ? 'online' : 'offline'}`}></span>
@@ -356,7 +382,7 @@ function App() {
 
             {activeTab === 'requests' && (requests.length > 0 ? requests.map(r => (
               <div key={r} className="item">
-                <div style={{display: 'flex', alignItems: 'center', gap: '10px'}}>
+                <div className="item-info">
                   <img src={usersData[r]?.photo} className="user-avatar" referrerPolicy="no-referrer" />
                   <span>{r}</span>
                 </div>
@@ -367,12 +393,12 @@ function App() {
             {activeTab === 'add' && (
               <div className="search-wrapper">
                 <input type="text" className="myinput" placeholder={language === 'ar' ? 'ابحث عن مستخدم...' : 'Search user...'} value={searchUser} onChange={(e) => handleSearch(e.target.value)} />
-                {searchError && <p style={{fontSize:'0.8rem', color:'#61dafb', margin:'5px'}}>{searchError}</p>}
+                {searchError && <p className="search-error-msg">{searchError}</p>}
                 {suggestions.length > 0 && (
                   <div className="autosuggest-box">
                     {suggestions.map(s => (
-                      <div key={s} className="suggest-item" onClick={() => sendRequest(s)} style={{display:'flex', alignItems:'center', gap:'10px'}}>
-                        <img src={usersData[s]?.photo} className="user-avatar" style={{width:'25px', height:'25px'}} referrerPolicy="no-referrer" />
+                      <div key={s} className="suggest-item" onClick={() => sendRequest(s)}>
+                        <img src={usersData[s]?.photo} className="user-avatar-small" referrerPolicy="no-referrer" />
                         {highlightMatch(s, searchUser)}
                       </div>
                     ))}
@@ -382,10 +408,10 @@ function App() {
             )}
           </div>
           <div className="tab-icons">
-            <div style={{position: 'relative'}}>
+            <div className="tab-icon-wrapper">
               <img src="https://cdn-icons-png.flaticon.com/512/2583/2583118.png" onClick={() => setActiveTab('friends')} className={activeTab === 'friends' ? 'active' : ''} />
             </div>
-            <div style={{position: 'relative'}}>
+            <div className="tab-icon-wrapper">
               <img src="https://cdn-icons-png.flaticon.com/512/1182/1182761.png" onClick={() => setActiveTab('requests')} className={activeTab === 'requests' ? 'active' : ''} />
               {requests.length > 0 && <span className="notif-badge"></span>}
             </div>
