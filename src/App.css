@@ -179,6 +179,7 @@ html, body {
     left: 0;
     width: 300px; 
     height: 100vh;
+    height: 100dvh;
     background: #0d0d1a; 
     backdrop-filter: blur(20px); 
     z-index: 3000;
@@ -189,6 +190,7 @@ html, body {
     box-sizing: border-box;
     border-right: 1px solid rgba(255,255,255,0.1);
     transform: translateX(-110%);
+    overflow: hidden;
 }
 
 /* RTL: anchor to right side, slide in from right */
@@ -235,14 +237,14 @@ html, body {
 .rtl-mode .move-to-ar { right: 4px; left: auto; }
 .rtl-mode .move-to-en { right: 50%; left: auto; }
 
-.list-container { flex: 1; overflow-y: auto; }
+.list-container { flex: 1; overflow-y: auto; min-height: 0; }
 .item { padding: 15px; background: rgba(255, 255, 255, 0.05); border-radius: 12px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; transition: background 0.2s; }
 .item:hover { background: rgba(255, 255, 255, 0.1); }
 /* Avatar always left of name; RTL inherited by parent aligns the group to the right */
 .item-info { display: flex; align-items: center; gap: 10px; direction: ltr; }
 
 .acc-btn { background: #61dafb; border: none; padding: 6px 15px; border-radius: 8px; cursor: pointer; font-weight: bold; color: #000; }
-.tab-icons { display: flex; justify-content: space-around; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.1); align-items: center; direction: ltr; }
+.tab-icons { display: flex; justify-content: space-around; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.1); align-items: center; direction: ltr; flex-shrink: 0; }
 .tab-icon-wrapper { position: relative; display: flex; align-items: center; justify-content: center; }
 .tab-icons img { width: 25px; opacity: 0.3; cursor: pointer; transition: 0.3s; }
 .tab-icons img.active { opacity: 1; filter: drop-shadow(0 0 5px #61dafb); }
