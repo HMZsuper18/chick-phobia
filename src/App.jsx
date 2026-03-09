@@ -160,7 +160,8 @@ function App() {
       snap.docs.forEach(d => {
         dataMap[d.id] = {
           photo: d.data().photo || 'https://cdn-icons-png.flaticon.com/512/149/149071.png',
-          online: d.data().online || false
+          online: d.data().online || false,
+          userNumber: d.data().userNumber || null
         }
         names.push(d.id)
       })
@@ -271,6 +272,8 @@ function App() {
       if (docSnap.exists()) {
         alert(t.taken)
       } else {
+        const allSnap = await getDocs(collection(db, "users"))
+        const nextNumber = allSnap.size + 1
         await setDoc(userRef, {
           uid: user.uid,
           email: user.email,
@@ -278,7 +281,9 @@ function App() {
           friends: {},
           requests: {},
           sentRequests: {},
-          online: true
+          online: true,
+          createdAt: serverTimestamp(),
+          userNumber: nextNumber
         })
         setNickname(cleanNick)
         setIsRegistered(true)
@@ -478,6 +483,11 @@ function App() {
     touchStartY.current = null
   }
 
+  const isGoldenUser = (username) => {
+    const data = usersData[username]
+    return data && data.userNumber !== null && data.userNumber <= 100
+  }
+
   const highlightMatch = (name, q) => {
     const parts = name.split(new RegExp(`(${q})`, 'giu'))
     return parts.map((part, i) =>
@@ -629,7 +639,12 @@ function App() {
             <img src={user?.photoURL} className="user-avatar" alt="User" referrerPolicy="no-referrer" />
             <span className="status-dot online"></span>
           </div>
-          <span className="user-nickname-top">{nickname}</span>
+          <span className="user-nickname-top">
+            {nickname}
+            {isGoldenUser(nickname) && (
+              <span className="material-symbols-outlined golden-badge" title="Early Member">military_tech</span>
+            )}
+          </span>
         </div>
         <h2 className="welcome-msg">{t.welcome}, {nickname}</h2>
         <div className="top-bar-spacer"></div>
@@ -658,7 +673,12 @@ function App() {
                     <span className={`status-dot ${usersData[selectedFriend]?.online ? 'online' : 'offline'}`}></span>
                   </div>
                   <div className="chat-top-text">
-                    <span className="chat-top-name">{selectedFriend}</span>
+                    <span className="chat-top-name">
+                      {selectedFriend}
+                      {isGoldenUser(selectedFriend) && (
+                        <span className="material-symbols-outlined golden-badge" title="Early Member">military_tech</span>
+                      )}
+                    </span>
                     <span className={`chat-top-status ${usersData[selectedFriend]?.online ? 'status-online-text' : ''}`}>
                       {usersData[selectedFriend]?.online ? t.online : t.offline}
                     </span>
@@ -831,7 +851,12 @@ function App() {
                         <img src={usersData[f]?.photo} className="user-avatar" referrerPolicy="no-referrer" alt="" />
                         <span className={`status-dot ${usersData[f]?.online ? 'online' : 'offline'}`}></span>
                       </div>
-                      <span dir="ltr" style={{ unicodeBidi: 'embed' }}>{f}</span>
+                      <span dir="ltr" style={{ unicodeBidi: 'embed' }}>
+                        {f}
+                        {isGoldenUser(f) && (
+                          <span className="material-symbols-outlined golden-badge" title="Early Member">military_tech</span>
+                        )}
+                      </span>
                     </div>
                   </div>
                 ))

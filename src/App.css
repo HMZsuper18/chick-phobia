@@ -617,7 +617,36 @@ html, body {
 .empty-txt { color: rgba(255,255,255,0.3); text-align: center; font-size: 0.9rem; padding: 20px 0; }
 .top-bar-spacer { width: 0; }
 
-/* ===================== SCROLLBAR ===================== */
+/* ===================== GOLDEN BADGE ===================== */
+.golden-badge {
+    font-size: 18px !important;
+    font-variation-settings: 'FILL' 1, 'wght' 500, 'GRAD' 0, 'opsz' 24 !important;
+    background: linear-gradient(135deg, #f5c842 0%, #ffae00 40%, #e8860a 70%, #f5c842 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-size: 200% 200%;
+    animation: goldShimmer 2.4s ease-in-out infinite;
+    filter: drop-shadow(0 0 4px rgba(245, 200, 66, 0.55));
+    display: inline-block;
+    vertical-align: middle;
+    margin-inline-start: 4px;
+    position: relative;
+    top: -1px;
+    flex-shrink: 0;
+    line-height: 1;
+}
+
+@keyframes goldShimmer {
+    0%   { background-position: 0% 50%;   filter: drop-shadow(0 0 4px rgba(245, 200, 66, 0.5)); }
+    50%  { background-position: 100% 50%; filter: drop-shadow(0 0 8px rgba(255, 200, 50, 0.85)); }
+    100% { background-position: 0% 50%;   filter: drop-shadow(0 0 4px rgba(245, 200, 66, 0.5)); }
+}
+
+.user-nickname-top { display: inline-flex; align-items: center; }
+.chat-top-name { display: inline-flex; align-items: center; flex-wrap: nowrap; }
+
+
 ::-webkit-scrollbar { width: 8px; }
 ::-webkit-scrollbar-track { background: rgba(255,255,255,0.02); border-radius: 10px; }
 ::-webkit-scrollbar-thumb { background: linear-gradient(180deg,#61dafb 0%,#4fa8c7 100%); border-radius: 10px; border: 2px solid transparent; background-clip: content-box; }
@@ -630,7 +659,7 @@ html, body {
 /* ===================== MATERIAL ICONS ===================== */
 .material-symbols-outlined {
     font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
-    vertical-align: middle; user-select: none; display: inline-block; line-height: 1;
+    user-select: none; display: inline-block; line-height: 1;
     text-transform: none; letter-spacing: normal; word-wrap: normal; white-space: nowrap;
     direction: ltr; -webkit-font-smoothing: antialiased; font-display: block;
 }
