@@ -5,9 +5,10 @@ import { initializeApp } from "firebase/app"
 import {
   getFirestore, doc, setDoc, getDoc, onSnapshot, updateDoc,
   deleteField, collection, getDocs, deleteDoc,
-  query, orderBy, limit, addDoc, serverTimestamp, startAfter
+  query, orderBy, limit, addDoc, serverTimestamp, startAfter, arrayUnion, arrayRemove
 } from "firebase/firestore"
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "firebase/auth"
+import { getDatabase, ref, onValue, onDisconnect, set } from "firebase/database"
 
 const firebaseConfig = {
   apiKey: "AIzaSyAuoY__cctnuVBUHvldAxLhp7kVbJSFk-U",
@@ -22,6 +23,7 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig)
 const db = getFirestore(app)
+const rtdb = getDatabase(app)
 const auth = getAuth(app)
 const provider = new GoogleAuthProvider()
 
@@ -114,12 +116,37 @@ function App() {
   const [swipeState, setSwipeState] = React.useState({})
   const [isClosingChat, setIsClosingChat] = React.useState(false)
 
+  const [groups, setGroups] = React.useState([])
+  const [selectedGroup, setSelectedGroup] = React.useState(null)
+  const [groupMessages, setGroupMessages] = React.useState([])
+  const [groupMsgInput, setGroupMsgInput] = React.useState('')
+  const [isGroupChatOpen, setIsGroupChatOpen] = React.useState(false)
+  const [isClosingGroupChat, setIsClosingGroupChat] = React.useState(false)
+  const [addGroupExpanded, setAddGroupExpanded] = React.useState(false)
+  const [selectedMembersForGroup, setSelectedMembersForGroup] = React.useState([])
+  const [newGroupName, setNewGroupName] = React.useState('')
+  const [groupCreationStep, setGroupCreationStep] = React.useState('select')
+  const [groupSettingsOpen, setGroupSettingsOpen] = React.useState(false)
+  const [groupSettingName, setGroupSettingName] = React.useState('')
+  const [groupSettingPassword, setGroupSettingPassword] = React.useState('')
+  const [replyingToGroup, setReplyingToGroup] = React.useState(null)
+  const [editingGroupMsg, setEditingGroupMsg] = React.useState(null)
+  const [activeGroupMenu, setActiveGroupMenu] = React.useState(null)
+  const [mobileGroupSheet, setMobileGroupSheet] = React.useState(null)
+  const [groupSwipeState, setGroupSwipeState] = React.useState({})
+
   const scrollRef = React.useRef()
+  const groupScrollRef = React.useRef()
   const listRef = React.useRef()
+  const groupListRef = React.useRef()
   const inputRef = React.useRef()
+  const groupInputRef = React.useRef()
   const longPressTimer = React.useRef(null)
   const touchStartX = React.useRef(null)
   const touchStartY = React.useRef(null)
+  const groupLongPressTimer = React.useRef(null)
+  const groupTouchStartX = React.useRef(null)
+  const groupTouchStartY = React.useRef(null)
 
   const CLOUD_NAME = "dbgqro4d3"
   const UPLOAD_PRESET = "chick phobia"
@@ -154,33 +181,66 @@ function App() {
 
   React.useEffect(() => {
     if (!user || !isRegistered) return
-    const unsub = onSnapshot(collection(db, "users"), (snap) => {
-      const dataMap = {}
+
+    const usersUnsub = onSnapshot(collection(db, "users"), (snap) => {
       const names = []
+      const baseData = {}
       snap.docs.forEach(d => {
-        dataMap[d.id] = {
-          photo: d.data().photo || 'https://cdn-icons-png.flaticon.com/512/149/149071.png',
-          online: d.data().online || false,
-          userNumber: d.data().userNumber || null
-        }
         names.push(d.id)
+        baseData[d.id] = {
+          photo: d.data().photo || 'https://cdn-icons-png.flaticon.com/512/149/149071.png',
+          userNumber: d.data().userNumber || null,
+          online: false
+        }
       })
-      setUsersData(dataMap)
       setAllUsers(names)
+      setUsersData(prev => ({ ...prev, ...baseData }))
     })
-    return () => unsub()
+
+    const statusRef = ref(rtdb, 'status')
+    const statusUnsub = onValue(statusRef, (snapshot) => {
+      const statuses = snapshot.val() || {}
+      setUsersData(prev => {
+        const newData = { ...prev }
+        Object.keys(statuses).forEach(id => {
+          if (newData[id]) {
+            newData[id].online = statuses[id].state === 'online'
+          }
+        })
+        return newData
+      })
+    })
+
+    return () => {
+      usersUnsub()
+      statusUnsub()
+    }
   }, [isRegistered, user])
 
   React.useEffect(() => {
+    if (!user || !isRegistered || !nickname) return
+    const groupsUnsub = onSnapshot(collection(db, "groups"), (snap) => {
+      const myGroups = snap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .filter(g => g.members && g.members.includes(nickname))
+      setGroups(myGroups)
+    })
+    return () => groupsUnsub()
+  }, [isRegistered, user, nickname])
+
+  React.useEffect(() => {
     if (isRegistered && nickname) {
-      const userRef = doc(db, "users", nickname)
-      updateDoc(userRef, { online: true })
-      const handleOffline = () => updateDoc(userRef, { online: false })
-      window.addEventListener('beforeunload', handleOffline)
-      return () => {
-        handleOffline()
-        window.removeEventListener('beforeunload', handleOffline)
-      }
+      const userStatusDatabaseRef = ref(rtdb, `/status/${nickname}`)
+      const connectedRef = ref(rtdb, ".info/connected")
+
+      const unsub = onValue(connectedRef, (snapshot) => {
+        if (snapshot.val() === false) return
+        onDisconnect(userStatusDatabaseRef).set({ state: 'offline' }).then(() => {
+          set(userStatusDatabaseRef, { state: 'online' })
+        })
+      })
+
+      return () => unsub()
     }
   }, [isRegistered, nickname])
 
@@ -202,7 +262,25 @@ function App() {
   }, [selectedFriend, nickname])
 
   React.useEffect(() => {
-    const handleClickOutside = () => setActiveMenu(null)
+    if (!selectedGroup || !nickname) return
+    const q = query(
+      collection(db, "groups", selectedGroup.id, "messages"),
+      orderBy("createdAt", "desc"),
+      limit(50)
+    )
+    const unsub = onSnapshot(q, (snap) => {
+      const fetched = snap.docs.map(d => ({ id: d.id, ...d.data() })).reverse()
+      setGroupMessages(fetched)
+      setTimeout(() => groupScrollRef.current?.scrollIntoView({ behavior: "smooth" }), 100)
+    })
+    return () => unsub()
+  }, [selectedGroup, nickname])
+
+  React.useEffect(() => {
+    const handleClickOutside = () => {
+      setActiveMenu(null)
+      setActiveGroupMenu(null)
+    }
     document.addEventListener('click', handleClickOutside)
     return () => document.removeEventListener('click', handleClickOutside)
   }, [])
@@ -281,7 +359,6 @@ function App() {
           friends: {},
           requests: {},
           sentRequests: {},
-          online: true,
           createdAt: serverTimestamp(),
           userNumber: nextNumber
         })
@@ -353,6 +430,30 @@ function App() {
     } catch (e) { console.error("Upload error:", e) }
   }
 
+  const handleGroupMediaUpload = async (file) => {
+    if (!file || !selectedGroup) return
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('upload_preset', UPLOAD_PRESET)
+    const resourceType = file.type.startsWith('video') ? 'video' : 'image'
+    try {
+      const res = await fetch(
+        `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/${resourceType}/upload`,
+        { method: 'POST', body: formData }
+      )
+      const data = await res.json()
+      if (data.secure_url) {
+        await addDoc(collection(db, "groups", selectedGroup.id, "messages"), {
+          [resourceType]: data.secure_url,
+          type: resourceType,
+          sender: nickname,
+          senderPhoto: user?.photoURL || '',
+          createdAt: serverTimestamp()
+        })
+      }
+    } catch (e) { console.error("Group upload error:", e) }
+  }
+
   const sendMessage = async (e) => {
     e.preventDefault()
     if (!msgInput.trim() || !selectedFriend) return
@@ -380,6 +481,39 @@ function App() {
     }
 
     await addDoc(collection(db, "chats", chatId, "messages"), msgData)
+  }
+
+  const sendGroupMessage = async (e) => {
+    e.preventDefault()
+    if (!groupMsgInput.trim() || !selectedGroup) return
+    const text = groupMsgInput
+
+    if (editingGroupMsg) {
+      const msgRef = doc(db, "groups", selectedGroup.id, "messages", editingGroupMsg.id)
+      await updateDoc(msgRef, { text, isEdited: true })
+      setEditingGroupMsg(null)
+      setGroupMsgInput('')
+      return
+    }
+
+    setGroupMsgInput('')
+    const msgData = {
+      text,
+      sender: nickname,
+      senderPhoto: user?.photoURL || '',
+      createdAt: serverTimestamp()
+    }
+
+    if (replyingToGroup) {
+      msgData.replyTo = {
+        id: replyingToGroup.id,
+        text: replyingToGroup.text || '',
+        sender: replyingToGroup.sender
+      }
+      setReplyingToGroup(null)
+    }
+
+    await addDoc(collection(db, "groups", selectedGroup.id, "messages"), msgData)
   }
 
   const handleReply = (msg) => {
@@ -434,15 +568,77 @@ function App() {
     }
   }
 
+  const handleGroupReply = (msg) => {
+    setReplyingToGroup(msg)
+    setEditingGroupMsg(null)
+    setActiveGroupMenu(null)
+    setMobileGroupSheet(null)
+    groupInputRef.current?.focus()
+  }
+
+  const handleGroupEdit = (msg) => {
+    setEditingGroupMsg(msg)
+    setGroupMsgInput(msg.text || '')
+    setReplyingToGroup(null)
+    setActiveGroupMenu(null)
+    setMobileGroupSheet(null)
+    groupInputRef.current?.focus()
+  }
+
+  const handleGroupDelete = async (msg) => {
+    if (!selectedGroup) return
+    const msgsRef = collection(db, "groups", selectedGroup.id, "messages")
+
+    await updateDoc(doc(msgsRef, msg.id), {
+      text: t.deletedMsg,
+      image: deleteField(),
+      video: deleteField(),
+      isDeleted: true
+    })
+
+    const allSnap = await getDocs(msgsRef)
+    const linked = allSnap.docs.filter(d => d.data().replyTo?.id === msg.id)
+    await Promise.all(
+      linked.map(d =>
+        updateDoc(doc(msgsRef, d.id), {
+          'replyTo.text': t.deletedMsg,
+          'replyTo.deleted': true
+        })
+      )
+    )
+
+    setActiveGroupMenu(null)
+    setMobileGroupSheet(null)
+
+    if (editingGroupMsg?.id === msg.id) {
+      setEditingGroupMsg(null)
+      setGroupMsgInput('')
+    }
+    if (replyingToGroup?.id === msg.id) {
+      setReplyingToGroup(null)
+    }
+  }
+
   const cancelReplyEdit = () => {
     setReplyingTo(null)
     setEditingMsg(null)
     setMsgInput('')
   }
 
+  const cancelGroupReplyEdit = () => {
+    setReplyingToGroup(null)
+    setEditingGroupMsg(null)
+    setGroupMsgInput('')
+  }
+
   const handleMenuToggle = (e, msgId) => {
     e.stopPropagation()
     setActiveMenu(prev => prev === msgId ? null : msgId)
+  }
+
+  const handleGroupMenuToggle = (e, msgId) => {
+    e.stopPropagation()
+    setActiveGroupMenu(prev => prev === msgId ? null : msgId)
   }
 
   const handleTouchStart = (e, msg) => {
@@ -483,6 +679,44 @@ function App() {
     touchStartY.current = null
   }
 
+  const handleGroupTouchStart = (e, msg) => {
+    const touch = e.touches[0]
+    groupTouchStartX.current = touch.clientX
+    groupTouchStartY.current = touch.clientY
+    groupLongPressTimer.current = setTimeout(() => {
+      groupLongPressTimer.current = null
+      setMobileGroupSheet(msg)
+    }, 500)
+  }
+
+  const handleGroupTouchMove = (e, msg) => {
+    if (!groupTouchStartX.current) return
+    const touch = e.touches[0]
+    const dx = touch.clientX - groupTouchStartX.current
+    const dy = touch.clientY - groupTouchStartY.current
+    if (Math.abs(dy) > Math.abs(dx)) {
+      clearTimeout(groupLongPressTimer.current)
+      return
+    }
+    if (dx > 8 && groupLongPressTimer.current) {
+      clearTimeout(groupLongPressTimer.current)
+      groupLongPressTimer.current = null
+    }
+    if (dx > 0 && dx < 80) {
+      setGroupSwipeState(prev => ({ ...prev, [msg.id]: dx }))
+    }
+  }
+
+  const handleGroupTouchEnd = (e, msg) => {
+    clearTimeout(groupLongPressTimer.current)
+    groupLongPressTimer.current = null
+    const dx = groupSwipeState[msg.id] || 0
+    if (dx >= 60) handleGroupReply(msg)
+    setGroupSwipeState(prev => ({ ...prev, [msg.id]: 0 }))
+    groupTouchStartX.current = null
+    groupTouchStartY.current = null
+  }
+
   const isGoldenUser = (username) => {
     const data = usersData[username]
     return data && data.userNumber !== null && data.userNumber <= 100
@@ -499,10 +733,36 @@ function App() {
 
   const openChat = (f) => {
     setSelectedFriend(f)
+    setSelectedGroup(null)
+    setIsGroupChatOpen(false)
     setIsFriendsOpen(false)
     setReplyingTo(null)
     setEditingMsg(null)
     setMsgInput('')
+  }
+
+  const openGroupChat = async (group) => {
+    let resolvedGroup = group
+    if (!group.memberUids || group.memberUids.length === 0) {
+      const allUsersSnap = await getDocs(collection(db, "users"))
+      const memberUids = allUsersSnap.docs
+        .filter(d => group.members && group.members.includes(d.id))
+        .map(d => d.data().uid)
+        .filter(Boolean)
+      if (memberUids.length > 0) {
+        await updateDoc(doc(db, "groups", group.id), { memberUids })
+        resolvedGroup = { ...group, memberUids }
+      }
+    }
+    setSelectedGroup(resolvedGroup)
+    setGroupSettingName(resolvedGroup.name)
+    setSelectedFriend(null)
+    setIsGroupChatOpen(true)
+    setIsFriendsOpen(false)
+    setReplyingToGroup(null)
+    setEditingGroupMsg(null)
+    setGroupMsgInput('')
+    setGroupSettingsOpen(false)
   }
 
   const handleBackFromChat = () => {
@@ -516,6 +776,19 @@ function App() {
     setIsClosingChat(true)
   }
 
+  const handleBackFromGroupChat = () => {
+    if (window.innerWidth >= 1024) {
+      setSelectedGroup(null)
+      setIsGroupChatOpen(false)
+      setReplyingToGroup(null)
+      setEditingGroupMsg(null)
+      setGroupMsgInput('')
+      setGroupSettingsOpen(false)
+      return
+    }
+    setIsClosingGroupChat(true)
+  }
+
   const handleChatAnimationEnd = () => {
     if (isClosingChat) {
       setIsClosingChat(false)
@@ -524,6 +797,73 @@ function App() {
       setEditingMsg(null)
       setMsgInput('')
     }
+  }
+
+  const handleGroupChatAnimationEnd = () => {
+    if (isClosingGroupChat) {
+      setIsClosingGroupChat(false)
+      setSelectedGroup(null)
+      setIsGroupChatOpen(false)
+      setReplyingToGroup(null)
+      setEditingGroupMsg(null)
+      setGroupMsgInput('')
+      setGroupSettingsOpen(false)
+    }
+  }
+
+  const toggleMemberSelection = (memberName) => {
+    setSelectedMembersForGroup(prev =>
+      prev.includes(memberName)
+        ? prev.filter(m => m !== memberName)
+        : [...prev, memberName]
+    )
+  }
+
+  const handleCreateGroupProceed = () => {
+    if (selectedMembersForGroup.length === 0) return
+    setGroupCreationStep('name')
+  }
+
+  const handleCreateGroupFinalize = async () => {
+    if (!newGroupName.trim()) return
+    const members = [nickname, ...selectedMembersForGroup]
+    const allUsersSnap = await getDocs(collection(db, "users"))
+    const memberUids = allUsersSnap.docs
+      .filter(d => members.includes(d.id))
+      .map(d => d.data().uid)
+    try {
+      await addDoc(collection(db, "groups"), {
+        name: newGroupName.trim(),
+        members,
+        memberUids,
+        createdBy: nickname,
+        createdAt: serverTimestamp(),
+        password: ''
+      })
+      setAddGroupExpanded(false)
+      setSelectedMembersForGroup([])
+      setNewGroupName('')
+      setGroupCreationStep('select')
+    } catch (e) { alert(t.error) }
+  }
+
+  const handleSaveGroupSettings = async () => {
+    if (!selectedGroup) return
+    const updates = {}
+    if (groupSettingName.trim()) updates.name = groupSettingName.trim()
+    if (groupSettingPassword !== undefined) updates.password = groupSettingPassword
+    try {
+      await updateDoc(doc(db, "groups", selectedGroup.id), updates)
+      setSelectedGroup(prev => ({ ...prev, ...updates }))
+      setGroupSettingsOpen(false)
+    } catch (e) { alert(t.error) }
+  }
+
+  const resetAddGroup = () => {
+    setAddGroupExpanded(false)
+    setSelectedMembersForGroup([])
+    setNewGroupName('')
+    setGroupCreationStep('select')
   }
 
   if (user === undefined) {
@@ -567,6 +907,8 @@ function App() {
     )
   }
 
+  const activeChatVisible = selectedFriend || isGroupChatOpen
+
   return (
     <div className={`app-container ${language === 'ar' ? 'rtl-mode' : ''} ${isSettingsOpen ? 'settings-active' : ''} ${isIOS ? 'ios-fix' : ''}`}>
       {isSettingsOpen && <div className="overlay overlay-settings" onClick={() => setIsSettingsOpen(false)}></div>}
@@ -601,6 +943,35 @@ function App() {
         </div>
       )}
 
+      {mobileGroupSheet && (
+        <div className="mobile-sheet-overlay" onClick={() => setMobileGroupSheet(null)}>
+          <div className="mobile-sheet" onClick={e => e.stopPropagation()}>
+            <div className="mobile-sheet-handle"></div>
+            <button className="sheet-action-btn" onClick={() => handleGroupReply(mobileGroupSheet)}>
+              <span className="material-symbols-outlined">reply</span>
+              {t.reply}
+            </button>
+            {mobileGroupSheet.sender === nickname && !mobileGroupSheet.isDeleted && (
+              <>
+                {mobileGroupSheet.text && (
+                  <button className="sheet-action-btn" onClick={() => handleGroupEdit(mobileGroupSheet)}>
+                    <span className="material-symbols-outlined">edit</span>
+                    {t.edit}
+                  </button>
+                )}
+                <button className="sheet-action-btn sheet-action-delete" onClick={() => handleGroupDelete(mobileGroupSheet)}>
+                  <span className="material-symbols-outlined">delete</span>
+                  {t.delete}
+                </button>
+              </>
+            )}
+            <button className="sheet-action-btn sheet-action-cancel" onClick={() => setMobileGroupSheet(null)}>
+              {t.cancel}
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className={`sidebar ${isSettingsOpen ? 'open' : ''}`}>
         <button className="close-btn sidebar-close-btn" onClick={() => setIsSettingsOpen(false)}>
           <span className="material-symbols-outlined">close</span>
@@ -624,7 +995,7 @@ function App() {
         </div>
         <button
           className="logout-btn-sidebar"
-          onClick={() => { updateDoc(doc(db, "users", nickname), { online: false }); signOut(auth) }}
+          onClick={() => { set(ref(rtdb, `/status/${nickname}`), { state: 'offline' }); signOut(auth) }}
         >
           {t.logout}
         </button>
@@ -657,7 +1028,6 @@ function App() {
               className={`chat-container${isClosingChat ? ' chat-closing' : ''}`}
               onAnimationEnd={handleChatAnimationEnd}
             >
-
               <div className="chat-top-bar">
                 <button className="chat-back-btn" onClick={handleBackFromChat}>
                   <span className="material-symbols-outlined">arrow_back_ios</span>
@@ -687,7 +1057,7 @@ function App() {
               </div>
 
               <div className="messages-list" ref={listRef} onScroll={handleScroll}>
-                {messages.map((m, index) => {
+                {messages.map((m) => {
                   const isMe = m.sender === nickname
                   const swipeDx = swipeState[m.id] || 0
 
@@ -753,9 +1123,7 @@ function App() {
                                   <div className="reply-header-body">
                                     <span className="reply-header-sender">{m.replyTo.sender}</span>
                                     <span className="reply-header-text">
-                                      {m.replyTo.deleted
-                                        ? t.deletedMsg
-                                        : (m.replyTo.text || '[media]')}
+                                      {m.replyTo.deleted ? t.deletedMsg : (m.replyTo.text || '[media]')}
                                     </span>
                                   </div>
                                 </div>
@@ -783,7 +1151,6 @@ function App() {
                           </div>
                         </div>
                       </div>
-
                     </div>
                   )
                 })}
@@ -832,6 +1199,228 @@ function App() {
                 </button>
               </form>
             </div>
+          ) : isGroupChatOpen && selectedGroup ? (
+            <div
+              className={`chat-container${isClosingGroupChat ? ' chat-closing' : ''}`}
+              onAnimationEnd={handleGroupChatAnimationEnd}
+            >
+              {groupSettingsOpen ? (
+                <div className="group-settings-overlay">
+                  <div className="group-settings-card">
+                    <div className="group-settings-header">
+                      <button className="group-settings-back-btn" onClick={() => setGroupSettingsOpen(false)}>
+                        <span className="material-symbols-outlined">arrow_back_ios</span>
+                      </button>
+                      <span className="group-settings-title">Group Settings</span>
+                    </div>
+                    <div className="group-settings-body">
+                      <div className="group-settings-field">
+                        <label>Group Name</label>
+                        <input
+                          className="myinput"
+                          value={groupSettingName}
+                          onChange={e => setGroupSettingName(e.target.value)}
+                          placeholder="Enter group name..."
+                        />
+                      </div>
+                      <div className="group-settings-field">
+                        <label>Group Password</label>
+                        <input
+                          className="myinput"
+                          value={groupSettingPassword}
+                          onChange={e => setGroupSettingPassword(e.target.value)}
+                          placeholder="Set a password (optional)..."
+                          type="text"
+                        />
+                      </div>
+                      <button className="acc-btn-full" onClick={handleSaveGroupSettings}>
+                        Save Changes
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+
+              <div className="chat-top-bar">
+                <button className="chat-back-btn" onClick={handleBackFromGroupChat}>
+                  <span className="material-symbols-outlined">arrow_back_ios</span>
+                </button>
+                <div className="chat-top-friend-info">
+                  <div className="chat-top-avatar-wrap">
+                    <div className="group-avatar-icon">
+                      <span className="material-symbols-outlined">group</span>
+                    </div>
+                  </div>
+                  <div className="chat-top-text">
+                    <span className="chat-top-name">{selectedGroup.name}</span>
+                    <span className="chat-top-status">{selectedGroup.members?.length || 0} members</span>
+                  </div>
+                </div>
+                <button className="group-dots-btn" onClick={e => { e.stopPropagation(); setGroupSettingsOpen(true) }}>
+                  <span className="material-symbols-outlined">more_vert</span>
+                </button>
+              </div>
+
+              <div className="messages-list" ref={groupListRef}>
+                {groupMessages.map((m) => {
+                  const isMe = m.sender === nickname
+                  const swipeDx = groupSwipeState[m.id] || 0
+
+                  return (
+                    <div
+                      key={m.id}
+                      className={`msg-wrapper ${isMe ? 'sent' : 'received'}`}
+                      style={{ marginTop: '6px' }}
+                    >
+                      {!isMe && (
+                        <img
+                          src={m.senderPhoto || usersData[m.sender]?.photo || 'https://cdn-icons-png.flaticon.com/512/149/149071.png'}
+                          className="group-msg-avatar"
+                          referrerPolicy="no-referrer"
+                          alt={m.sender}
+                        />
+                      )}
+                      <div className="msg-content-wrapper">
+                        {!isMe && <span className="group-msg-sender-name">{m.sender}</span>}
+                        <div
+                          className="msg-with-menu"
+                          style={{
+                            transform: `translateX(${swipeDx}px)`,
+                            transition: swipeDx === 0 ? 'transform 0.3s ease' : 'none'
+                          }}
+                          onTouchStart={e => handleGroupTouchStart(e, m)}
+                          onTouchMove={e => handleGroupTouchMove(e, m)}
+                          onTouchEnd={e => handleGroupTouchEnd(e, m)}
+                        >
+                          {swipeDx > 10 && (
+                            <div className="swipe-reply-icon" style={{ opacity: Math.min(swipeDx / 60, 1) }}>
+                              <span className="material-symbols-outlined">reply</span>
+                            </div>
+                          )}
+
+                          <div className={`msg-hover-wrapper ${isMe ? 'hover-sent' : 'hover-received'}`}>
+                            <button
+                              className="msg-menu-btn"
+                              onClick={e => handleGroupMenuToggle(e, m.id)}
+                            >
+                              <span className="material-symbols-outlined">more_vert</span>
+                            </button>
+
+                            {activeGroupMenu === m.id && (
+                              <div
+                                className={`msg-context-menu ${isMe ? 'menu-sent' : 'menu-received'}`}
+                                onClick={e => e.stopPropagation()}
+                              >
+                                <button onClick={() => handleGroupReply(m)}>
+                                  <span className="material-symbols-outlined">reply</span>
+                                  {t.reply}
+                                </button>
+                                {isMe && !m.isDeleted && m.text && (
+                                  <button onClick={() => handleGroupEdit(m)}>
+                                    <span className="material-symbols-outlined">edit</span>
+                                    {t.edit}
+                                  </button>
+                                )}
+                                {isMe && !m.isDeleted && (
+                                  <button className="menu-delete-btn" onClick={() => handleGroupDelete(m)}>
+                                    <span className="material-symbols-outlined">delete</span>
+                                    {t.delete}
+                                  </button>
+                                )}
+                              </div>
+                            )}
+
+                            <div className={`message ${m.isDeleted ? 'message-deleted' : ''}${m.replyTo ? ' message-has-reply' : ''}`}>
+                              {m.replyTo && (
+                                <div className={`reply-header ${isMe ? 'reply-header-sent' : 'reply-header-received'}`}>
+                                  <div className="reply-header-bar"></div>
+                                  <div className="reply-header-body">
+                                    <span className="reply-header-sender">{m.replyTo.sender}</span>
+                                    <span className="reply-header-text">
+                                      {m.replyTo.deleted ? t.deletedMsg : (m.replyTo.text || '[media]')}
+                                    </span>
+                                  </div>
+                                </div>
+                              )}
+
+                              {m.isDeleted ? (
+                                <span className="deleted-msg-text">{t.deletedMsg}</span>
+                              ) : (
+                                <div className="msg-body">
+                                  {m.image && <img src={m.image} alt="sent" className="msg-media" />}
+                                  {m.video && (
+                                    <video controls className="msg-media">
+                                      <source src={m.video} type="video/mp4" />
+                                    </video>
+                                  )}
+                                  {m.text && (
+                                    <span>
+                                      {m.text}
+                                      {m.isEdited && <span className="edited-label"> {t.edited}</span>}
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      {isMe && (
+                        <img
+                          src={user?.photoURL || 'https://cdn-icons-png.flaticon.com/512/149/149071.png'}
+                          className="group-msg-avatar"
+                          referrerPolicy="no-referrer"
+                          alt={nickname}
+                        />
+                      )}
+                    </div>
+                  )
+                })}
+                <div ref={groupScrollRef}></div>
+              </div>
+
+              {(replyingToGroup || editingGroupMsg) && (
+                <div className="input-context-bar">
+                  <div className="input-context-info">
+                    <span className="material-symbols-outlined input-context-icon">
+                      {editingGroupMsg ? 'edit' : 'reply'}
+                    </span>
+                    <div className="input-context-text">
+                      <span className="input-context-label">
+                        {editingGroupMsg ? t.editing : `${t.replyingTo} ${replyingToGroup.sender}`}
+                      </span>
+                      <span className="input-context-preview">
+                        {editingGroupMsg ? (editingGroupMsg.text || '[media]') : (replyingToGroup.text || '[media]')}
+                      </span>
+                    </div>
+                  </div>
+                  <button className="input-context-cancel" onClick={cancelGroupReplyEdit}>
+                    <span className="material-symbols-outlined">close</span>
+                  </button>
+                </div>
+              )}
+
+              <form className="chat-input-area" onSubmit={sendGroupMessage}>
+                <input type="file" id="grp-img-upload" style={{ display: 'none' }} accept="image/*" onChange={e => handleGroupMediaUpload(e.target.files[0])} />
+                <label htmlFor="grp-img-upload" className="media-label">
+                  <span className="material-symbols-outlined">image</span>
+                </label>
+                <input type="file" id="grp-vid-upload" style={{ display: 'none' }} accept="video/*" onChange={e => handleGroupMediaUpload(e.target.files[0])} />
+                <label htmlFor="grp-vid-upload" className="media-label">
+                  <span className="material-symbols-outlined">videocam</span>
+                </label>
+                <input
+                  ref={groupInputRef}
+                  className="myinput"
+                  value={groupMsgInput}
+                  onChange={e => setGroupMsgInput(e.target.value)}
+                  placeholder={t.type}
+                />
+                <button type="submit" className="acc-btn">
+                  <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>send</span>
+                </button>
+              </form>
+            </div>
           ) : (
             <div className="chat-placeholder">{t.selectFriend}</div>
           )}
@@ -841,65 +1430,179 @@ function App() {
           <button className="close-btn" onClick={() => setIsFriendsOpen(false)}>
             <span className="material-symbols-outlined">close</span>
           </button>
-          <div className="list-container">
-            {activeTab === 'friends' && (
-              friends.length > 0
-                ? friends.map(f => (
-                  <div key={f} className="item" onClick={() => openChat(f)}>
-                    <div className="item-info">
-                      <div style={{ position: 'relative', flexShrink: 0 }}>
-                        <img src={usersData[f]?.photo} className="user-avatar" referrerPolicy="no-referrer" alt="" />
-                        <span className={`status-dot ${usersData[f]?.online ? 'online' : 'offline'}`}></span>
-                      </div>
-                      <span dir="ltr" style={{ unicodeBidi: 'embed' }}>
-                        {f}
-                        {isGoldenUser(f) && (
-                          <span className="material-symbols-outlined golden-badge" title="Early Member">military_tech</span>
-                        )}
-                      </span>
-                    </div>
-                  </div>
-                ))
-                : <p className="empty-txt">{t.noFriends}</p>
-            )}
 
-            {activeTab === 'requests' && (
-              requests.length > 0
-                ? requests.map(r => (
-                  <div key={r} className="item">
-                    <div className="item-info">
-                      <img src={usersData[r]?.photo} className="user-avatar" referrerPolicy="no-referrer" alt="" />
-                      <span dir="ltr" style={{ unicodeBidi: 'embed' }}>{r}</span>
-                    </div>
-                    <button onClick={() => acceptFriend(r)} className="acc-btn">Accept</button>
-                  </div>
-                ))
-                : <p className="empty-txt">{t.noRequests}</p>
-            )}
-
-            {activeTab === 'add' && (
-              <div className="search-wrapper">
-                <input
-                  type="text"
-                  className="myinput"
-                  placeholder={t.searchUser}
-                  value={searchUser}
-                  onChange={e => handleSearch(e.target.value)}
-                />
-                {searchError && <p className="search-error-msg">{searchError}</p>}
-                {suggestions.length > 0 && (
-                  <div className="autosuggest-box">
-                    {suggestions.map(s => (
-                      <div key={s} className="suggest-item" onClick={() => sendRequest(s)}>
-                        <img src={usersData[s]?.photo} className="user-avatar-small" referrerPolicy="no-referrer" alt="" />
-                        <span dir="ltr" style={{ unicodeBidi: 'embed' }}>{highlightMatch(s, searchUser)}</span>
+          {activeTab !== 'groups' && (
+            <div className="list-container">
+              {activeTab === 'friends' && (
+                friends.length > 0
+                  ? friends.map(f => (
+                    <div key={f} className="item" onClick={() => openChat(f)}>
+                      <div className="item-info">
+                        <div style={{ position: 'relative', flexShrink: 0 }}>
+                          <img src={usersData[f]?.photo} className="user-avatar" referrerPolicy="no-referrer" alt="" />
+                          <span className={`status-dot ${usersData[f]?.online ? 'online' : 'offline'}`}></span>
+                        </div>
+                        <span dir="ltr" style={{ unicodeBidi: 'embed' }}>
+                          {f}
+                          {isGoldenUser(f) && (
+                            <span className="material-symbols-outlined golden-badge" title="Early Member">military_tech</span>
+                          )}
+                        </span>
                       </div>
-                    ))}
-                  </div>
-                )}
+                    </div>
+                  ))
+                  : <p className="empty-txt">{t.noFriends}</p>
+              )}
+
+              {activeTab === 'requests' && (
+                requests.length > 0
+                  ? requests.map(r => (
+                    <div key={r} className="item">
+                      <div className="item-info">
+                        <img src={usersData[r]?.photo} className="user-avatar" referrerPolicy="no-referrer" alt="" />
+                        <span dir="ltr" style={{ unicodeBidi: 'embed' }}>{r}</span>
+                      </div>
+                      <button onClick={() => acceptFriend(r)} className="acc-btn">Accept</button>
+                    </div>
+                  ))
+                  : <p className="empty-txt">{t.noRequests}</p>
+              )}
+
+              {activeTab === 'add' && (
+                <div className="search-wrapper">
+                  <input
+                    type="text"
+                    className="myinput"
+                    placeholder={t.searchUser}
+                    value={searchUser}
+                    onChange={e => handleSearch(e.target.value)}
+                  />
+                  {searchError && <p className="search-error-msg">{searchError}</p>}
+                  {suggestions.length > 0 && (
+                    <div className="autosuggest-box">
+                      {suggestions.map(s => (
+                        <div key={s} className="suggest-item" onClick={() => sendRequest(s)}>
+                          <img src={usersData[s]?.photo} className="user-avatar-small" referrerPolicy="no-referrer" alt="" />
+                          <span dir="ltr" style={{ unicodeBidi: 'embed' }}>{highlightMatch(s, searchUser)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'groups' && (
+            <div className="groups-tab-layout">
+              <div className="groups-list-area">
+                {groups.length > 0
+                  ? groups.map(g => (
+                    <div key={g.id} className="item group-item" onClick={() => openGroupChat(g)}>
+                      <div className="item-info">
+                        <div className="group-item-avatar">
+                          <span className="material-symbols-outlined">group</span>
+                        </div>
+                        <div className="group-item-text">
+                          <span className="group-item-name">{g.name}</span>
+                          <span className="group-item-count">{g.members?.length || 0} members</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                  : <p className="empty-txt">No groups yet</p>
+                }
               </div>
-            )}
-          </div>
+
+              <div className={`add-group-section ${addGroupExpanded ? 'expanded' : ''}`}>
+                <div className="add-group-header">
+                  <span className="add-group-label">Create Group</span>
+                  <button
+                    className={`add-group-arrow-btn ${addGroupExpanded ? 'rotated' : ''}`}
+                    onClick={() => {
+                      if (addGroupExpanded) {
+                        resetAddGroup()
+                      } else {
+                        setAddGroupExpanded(true)
+                        setGroupCreationStep('select')
+                      }
+                    }}
+                  >
+                    <span className="material-symbols-outlined">expand_less</span>
+                  </button>
+                </div>
+
+                <div className="add-group-body">
+                  {groupCreationStep === 'select' && (
+                    <>
+                      <p className="add-group-hint">Select friends to add:</p>
+                      <div className="group-member-select-list">
+                        {friends.length > 0
+                          ? friends.map(f => (
+                            <div
+                              key={f}
+                              className={`group-member-item ${selectedMembersForGroup.includes(f) ? 'selected' : ''}`}
+                              onClick={() => toggleMemberSelection(f)}
+                            >
+                              <div className="group-member-item-left">
+                                <img
+                                  src={usersData[f]?.photo || 'https://cdn-icons-png.flaticon.com/512/149/149071.png'}
+                                  className="user-avatar-small"
+                                  referrerPolicy="no-referrer"
+                                  alt=""
+                                />
+                                <span>{f}</span>
+                              </div>
+                              <div className={`group-member-checkbox ${selectedMembersForGroup.includes(f) ? 'checked' : ''}`}>
+                                {selectedMembersForGroup.includes(f) && (
+                                  <span className="material-symbols-outlined">check</span>
+                                )}
+                              </div>
+                            </div>
+                          ))
+                          : <p className="empty-txt" style={{ padding: '8px 0' }}>{t.noFriends}</p>
+                        }
+                      </div>
+                      {selectedMembersForGroup.length > 0 && (
+                        <button className="acc-btn-full" style={{ marginTop: '10px' }} onClick={handleCreateGroupProceed}>
+                          Next ({selectedMembersForGroup.length} selected)
+                        </button>
+                      )}
+                    </>
+                  )}
+
+                  {groupCreationStep === 'name' && (
+                    <>
+                      <p className="add-group-hint">Name your group:</p>
+                      <input
+                        className="myinput"
+                        placeholder="Group name..."
+                        value={newGroupName}
+                        onChange={e => setNewGroupName(e.target.value)}
+                      />
+                      <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
+                        <button
+                          className="acc-btn"
+                          style={{ flex: 1, padding: '10px' }}
+                          onClick={() => setGroupCreationStep('select')}
+                        >
+                          Back
+                        </button>
+                        <button
+                          className="acc-btn-full"
+                          style={{ flex: 2, marginTop: 0 }}
+                          onClick={handleCreateGroupFinalize}
+                        >
+                          Create
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="tab-icons">
             <div className="tab-icon-wrapper">
               <span className={`material-symbols-outlined tab-icon ${activeTab === 'friends' ? 'active' : ''}`} onClick={() => setActiveTab('friends')}>group</span>
@@ -909,6 +1612,7 @@ function App() {
               {requests.length > 0 && <span className="notif-badge"></span>}
             </div>
             <span className={`material-symbols-outlined tab-icon ${activeTab === 'add' ? 'active' : ''}`} onClick={() => setActiveTab('add')}>person_search</span>
+            <span className={`material-symbols-outlined tab-icon ${activeTab === 'groups' ? 'active' : ''}`} onClick={() => setActiveTab('groups')}>forum</span>
           </div>
         </div>
       </div>
