@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title>Chick Phobia Feedback</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@48,400,0,0" rel="stylesheet">
+
+    <style>
+        :root {
+            --bg-dark: #06060c;
+            --card-bg: #0d0d1a;
+            --input-bg: #161625;
+            --accent-blue: #61dafb;
+            --accent-red: #ff4b2b;
+            --text-white: #e0e0e0;
+            --text-gray: #88889b;
+            --max-width: 600px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            -webkit-box-sizing: border-box;
+            -moz-box-sizing: border-box;
+            box-sizing: border-box;
+            font-family: 'Cairo', Arial, sans-serif;
+        }
+
+        html {
+            -webkit-text-size-adjust: 100%;
+            -ms-text-size-adjust: 100%;
+        }
+
+        body {
+            background-color: #06060c;
+            background-image: 
+                radial-gradient(circle at 10% 20%, rgba(97, 218, 251, 0.05) 0%, transparent 20%),
+                radial-gradient(circle at 90% 80%, rgba(255, 75, 43, 0.05) 0%, transparent 20%);
+            color: #e0e0e0;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* ── LANGUAGE SELECTOR OVERLAY ── */
+        #lang-slide {
+            position: fixed;
+            inset: 0;
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #06060c;
+            background-image:
+                radial-gradient(circle at 20% 30%, rgba(97,218,251,0.07) 0%, transparent 40%),
+                radial-gradient(circle at 80% 70%, rgba(255,75,43,0.07) 0%, transparent 40%);
+            transition: opacity 0.6s ease, visibility 0.6s ease;
+        }
+
+        #lang-slide.hidden {
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+        }
+
+        .lang-card {
+            text-align: center;
+            padding: 20px;
+            animation: fadeUp 0.7s ease both;
+        }
+
+        @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(30px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        .lang-title {
+            font-size: clamp(1.1rem, 3vw, 1.4rem);
+            font-weight: 400;
+            color: #88889b;
+            letter-spacing: 0.08em;
+            margin-bottom: 10px;
+            animation: fadeUp 0.7s ease 0.1s both;
+        }
+
+        .lang-headline {
+            font-size: clamp(2rem, 7vw, 3.5rem);
+            font-weight: 800;
+            line-height: 1.15;
+            margin-bottom: 50px;
+            background: linear-gradient(135deg, #61dafb 0%, #ff4b2b 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            color: #61dafb; /* fallback */
+            animation: fadeUp 0.7s ease 0.2s both;
+        }
+
+        .lang-options {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            flex-wrap: wrap;
+            animation: fadeUp 0.7s ease 0.35s both;
+        }
+
+        .lang-btn {
+            position: relative;
+            width: 200px;
+            padding: 28px 20px 24px;
+            border-radius: 20px;
+            border: 1.5px solid rgba(255,255,255,0.1);
+            background: #0d0d1a;
+            cursor: pointer;
+            transition: transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+            overflow: hidden;
+            text-align: center;
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .lang-btn::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            border-radius: inherit;
+        }
+
+        .lang-btn.ar::before {
+            background: radial-gradient(circle at 50% 0%, rgba(97,218,251,0.12) 0%, transparent 70%);
+        }
+
+        .lang-btn.en::before {
+            background: radial-gradient(circle at 50% 0%, rgba(255,75,43,0.12) 0%, transparent 70%);
+        }
+
+        .lang-btn:hover::before { opacity: 1; }
+
+        .lang-btn:hover {
+            transform: translateY(-6px);
+        }
+
+        .lang-btn.ar:hover {
+            border-color: rgba(97,218,251,0.5);
+            box-shadow: 0 16px 32px rgba(97,218,251,0.15), 0 0 0 1px rgba(97,218,251,0.2);
+        }
+
+        .lang-btn.en:hover {
+            border-color: rgba(255,75,43,0.5);
+            box-shadow: 0 16px 32px rgba(255,75,43,0.15), 0 0 0 1px rgba(255,75,43,0.2);
+        }
+
+        .lang-btn:active {
+            transform: translateY(-2px) scale(0.98);
+        }
+
+        .lang-flag {
+            font-size: 2.4rem;
+            display: block;
+            margin-bottom: 12px;
+            line-height: 1;
+        }
+
+        .lang-name {
+            display: block;
+            font-size: 1.4rem;
+            font-weight: 800;
+            margin-bottom: 4px;
+        }
+
+        .lang-btn.ar .lang-name { color: #61dafb; direction: rtl; }
+        .lang-btn.en .lang-name { color: #ff4b2b; direction: ltr; }
+
+        .lang-native {
+            display: block;
+            font-size: 0.8rem;
+            color: #88889b;
+            letter-spacing: 0.05em;
+        }
+
+        .lang-btn.ar .lang-native { direction: rtl; }
+        .lang-btn.en .lang-native { direction: ltr; }
+
+        /* Active selection pulse */
+        .lang-btn.selecting {
+            animation: pulse 0.4s ease;
+        }
+        @keyframes pulse {
+            0%   { transform: scale(1); }
+            50%  { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        /* ── MAIN APP (hidden until language chosen) ── */
+        #app {
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            opacity: 0;
+            transition: opacity 0.5s ease;
+            pointer-events: none;
+        }
+
+        #app.visible {
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        .main-wrapper {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 40px 20px;
+        }
+
+        .feedback-container {
+            width: 100%;
+            max-width: 600px;
+            position: relative;
+            padding-top: 60px;
+        }
+
+        .back-link {
+            position: absolute;
+            top: 10px;
+            left: 0;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            transition: transform 0.3s ease;
+        }
+
+        .back-link .material-symbols-outlined {
+            font-size: 35px;
+            color: #e0e0e0;
+        }
+
+        .back-link:hover {
+            transform: translateX(-8px);
+        }
+
+        /* When English is active, flip back arrow direction */
+        [dir="ltr"] .back-link {
+            left: auto;
+            right: 0;
+        }
+
+        [dir="ltr"] .back-link:hover {
+            transform: translateX(8px);
+        }
+
+        .header-group {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .gradient-text {
+            font-size: clamp(1.8rem, 5vw, 2.5rem);
+            font-weight: 800;
+            background: linear-gradient(to left, #61dafb, #ff4b2b);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            color: #61dafb;
+            line-height: 1.4;
+        }
+
+        @supports not (-webkit-text-fill-color: transparent) {
+            .gradient-text { background: none; color: #61dafb; }
+        }
+
+        .divider {
+            display: block;
+            margin: 10px 0;
+            color: #88889b;
+            font-weight: bold;
+        }
+
+        .feedback-form {
+            background: #0d0d1a;
+            padding: 40px;
+            border-radius: 24px;
+            border: 1px solid rgba(255,255,255,0.08);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+        }
+
+        .input-field {
+            margin-bottom: 25px;
+        }
+
+        .input-field label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 0.9rem;
+            color: #61dafb;
+            padding-right: 5px;
+        }
+
+        [dir="ltr"] .input-field label {
+            padding-right: 0;
+            padding-left: 5px;
+        }
+
+        .input-field input,
+        .input-field textarea {
+            width: 100%;
+            background: #161625;
+            border: 1.5px solid rgba(255,255,255,0.1);
+            border-radius: 12px;
+            padding: 15px;
+            color: white;
+            font-size: 1rem;
+            font-family: 'Cairo', Arial, sans-serif;
+            outline: none;
+            transition: all 0.3s ease;
+            -webkit-appearance: none;
+            appearance: none;
+        }
+
+        /* Text direction inherits from html dir attribute */
+        .input-field input,
+        .input-field textarea {
+            text-align: inherit;
+            direction: inherit;
+        }
+
+        .input-field input::-webkit-input-placeholder,
+        .input-field textarea::-webkit-input-placeholder { color: #88889b; opacity: 1; }
+        .input-field input::-moz-placeholder,
+        .input-field textarea::-moz-placeholder { color: #88889b; opacity: 1; }
+        .input-field input:-ms-input-placeholder,
+        .input-field textarea:-ms-input-placeholder { color: #88889b; opacity: 1; }
+        .input-field input::placeholder,
+        .input-field textarea::placeholder { color: #88889b; opacity: 1; }
+
+        .input-field input:focus,
+        .input-field textarea:focus {
+            border-color: #61dafb;
+            background: #1c1c30;
+            box-shadow: 0 0 15px rgba(97,218,251,0.1);
+        }
+
+        .input-field textarea {
+            resize: vertical;
+            min-height: 120px;
+        }
+
+        .cta-button {
+            width: 100%;
+            padding: 18px;
+            border-radius: 12px;
+            border: none;
+            background: linear-gradient(135deg, #61dafb, #46aed0);
+            color: #06060c;
+            font-weight: 800;
+            font-size: 1.1rem;
+            font-family: 'Cairo', Arial, sans-serif;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            box-shadow: 0 10px 20px rgba(97,218,251,0.2);
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .cta-button:hover {
+            transform: translateY(-4px) scale(1.02);
+            box-shadow: 0 15px 25px rgba(97,218,251,0.3);
+        }
+
+        .cta-button:active {
+            transform: translateY(-1px) scale(0.99);
+        }
+
+        .form-note {
+            text-align: center;
+            font-size: 0.8rem;
+            color: #88889b;
+            margin-top: 20px;
+        }
+
+        /* Lang switcher pill (shown inside app) */
+        .lang-switcher {
+            position: absolute;
+            top: 12px;
+            right: 0;
+        }
+
+        [dir="ltr"] .lang-switcher {
+            right: auto;
+            left: 0;
+        }
+
+        .lang-switcher button {
+            background: #161625;
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 20px;
+            padding: 5px 14px;
+            color: #88889b;
+            font-size: 0.8rem;
+            font-family: 'Cairo', Arial, sans-serif;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            touch-action: manipulation;
+        }
+
+        .lang-switcher button:hover {
+            border-color: rgba(97,218,251,0.4);
+            color: #61dafb;
+        }
+
+        footer {
+            padding: 25px;
+            text-align: center;
+            color: #88889b;
+            font-size: 0.9rem;
+            border-top: 1px solid rgba(255,255,255,0.05);
+        }
+
+        @media screen and (min-width: 1024px) {
+            .feedback-form { padding: 50px; }
+            .main-wrapper { padding: 60px 20px; }
+        }
+
+        @media screen and (max-width: 480px) {
+            .feedback-form { padding: 25px 20px; border-radius: 18px; }
+            .lang-btn { width: 155px; padding: 22px 15px 18px; }
+            .input-field input,
+            .input-field textarea { font-size: 16px; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- ── LANGUAGE SELECTION SLIDE ── -->
+    <div id="lang-slide" role="dialog" aria-modal="true" aria-label="Choose language / اختر اللغة">
+        <div class="lang-card">
+            <p class="lang-title">Welcome · أهلاً وسهلاً</p>
+            <h1 class="lang-headline">Choose your language<br>اختر لغتك</h1>
+            <div class="lang-options">
+                <button class="lang-btn ar" onclick="selectLang('ar')" aria-label="العربية">
+                    <span class="lang-flag">🇸🇦</span>
+                    <span class="lang-name">عربي</span>
+                    <span class="lang-native">Arabic</span>
+                </button>
+                <button class="lang-btn en" onclick="selectLang('en')" aria-label="English">
+                    <span class="lang-flag">🇺🇸</span>
+                    <span class="lang-name">English</span>
+                    <span class="lang-native">الإنجليزية</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── MAIN APP ── -->
+    <div id="app">
+        <main class="main-wrapper">
+            <section class="feedback-container">
+
+                <a href="https://chick-phobia.web.app" class="back-link" title="العودة للرئيسية">
+                    <span class="material-symbols-outlined" aria-hidden="true">arrow_back</span>
+                </a>
+
+                <!-- Language switcher pill -->
+                <div class="lang-switcher">
+                    <button onclick="showLangSlide()" id="lang-pill">🌐 EN</button>
+                </div>
+
+                <div class="header-group">
+                    <h1 class="gradient-text" id="title1">شاركنا رأيك</h1>
+                    <span class="divider" role="separator" id="divider">أو</span>
+                    <h1 class="gradient-text" id="title2">أبلغ عن مشكلة</h1>
+                </div>
+
+                <form action="https://formspree.io/f/xzdjegrq" method="POST" class="feedback-form" novalidate>
+                    <input type="hidden" name="_subject" value="a new feedback from chick phobia website">
+                    <input type="hidden" name="المصدر" value="chick phobia website">
+
+                    <div class="input-field">
+                        <label for="email-input" id="label-email">البريد الإلكتروني</label>
+                        <input
+                            type="email"
+                            id="email-input"
+                            name="البريد_الإلكتروني"
+                            placeholder="example@mail.com"
+                            required
+                            autocomplete="email"
+                            inputmode="email"
+                        >
+                    </div>
+
+                    <div class="input-field">
+                        <label for="message-input" id="label-msg">رسالتك</label>
+                        <textarea
+                            id="message-input"
+                            name="الرسالة"
+                            placeholder="اكتب تفاصيل رأيك أو المشكلة هنا..."
+                            id="textarea-msg"
+                            rows="5"
+                            required
+                        ></textarea>
+                    </div>
+
+                    <button type="submit" class="cta-button" id="btn-submit">إرسال Feedback</button>
+                    <p class="form-note" id="form-note">يتم إرسال الرسائل مباشرةً لبريد المطور حمزة.</p>
+                </form>
+            </section>
+        </main>
+
+        <footer>
+            <p id="footer-copy">&copy; 2026 | chick phobia. كل الحقوق محفوظة.</p>
+        </footer>
+    </div>
+
+    <script>
+        const strings = {
+            ar: {
+                dir: 'rtl',
+                lang: 'ar',
+                title1: 'شاركنا رأيك',
+                divider: 'أو',
+                title2: 'أبلغ عن مشكلة',
+                labelEmail: 'البريد الإلكتروني',
+                labelMsg: 'رسالتك',
+                placeholder: 'اكتب تفاصيل رأيك أو المشكلة هنا...',
+                btnSubmit: 'إرسال Feedback',
+                formNote: 'يتم إرسال الرسائل مباشرةً لبريد المطور حمزة.',
+                footer: '© 2026 | chick phobia. كل الحقوق محفوظة.',
+                backTitle: 'العودة للرئيسية',
+                pill: '🌐 EN',
+                backArrow: 'arrow_back'
+            },
+            en: {
+                dir: 'ltr',
+                lang: 'en',
+                title1: 'Share Your Feedback',
+                divider: 'or',
+                title2: 'Report an Issue',
+                labelEmail: 'Email Address',
+                labelMsg: 'Your Message',
+                placeholder: 'Write your feedback or describe the problem here...',
+                btnSubmit: 'Send Feedback',
+                formNote: 'Messages are sent directly to the developer Hamza.',
+                footer: '© 2026 | chick phobia. All rights reserved.',
+                backTitle: 'Back to Homepage',
+                pill: '🌐 عربي',
+                backArrow: 'arrow_back'
+            }
+        };
+
+        function applyLang(lang) {
+            const s = strings[lang];
+            const html = document.documentElement;
+            html.setAttribute('lang', s.lang);
+            html.setAttribute('dir', s.dir);
+
+            document.getElementById('title1').textContent      = s.title1;
+            document.getElementById('divider').textContent     = s.divider;
+            document.getElementById('title2').textContent      = s.title2;
+            document.getElementById('label-email').textContent = s.labelEmail;
+            document.getElementById('label-msg').textContent   = s.labelMsg;
+            document.getElementById('message-input').placeholder = s.placeholder;
+            document.getElementById('btn-submit').textContent  = s.btnSubmit;
+            document.getElementById('form-note').textContent   = s.formNote;
+            document.getElementById('footer-copy').textContent = s.footer;
+            document.getElementById('lang-pill').textContent   = s.pill;
+            document.querySelector('.back-link').title         = s.backTitle;
+        }
+
+        function selectLang(lang) {
+            // Visual pulse feedback
+            const btn = document.querySelector('.lang-btn.' + lang);
+            btn.classList.add('selecting');
+            setTimeout(() => btn.classList.remove('selecting'), 400);
+
+            applyLang(lang);
+
+            // Dismiss slide
+            const slide = document.getElementById('lang-slide');
+            slide.classList.add('hidden');
+
+            // Reveal app
+            const app = document.getElementById('app');
+            app.classList.add('visible');
+
+            // Save preference
+            try { localStorage.setItem('cp_lang', lang); } catch(e) {}
+        }
+
+        function showLangSlide() {
+            document.getElementById('lang-slide').classList.remove('hidden');
+            document.getElementById('app').classList.remove('visible');
+        }
+
+        // On page load: check for saved preference
+        (function() {
+            let saved = null;
+            try { saved = localStorage.getItem('cp_lang'); } catch(e) {}
+            if (saved === 'ar' || saved === 'en') {
+                selectLang(saved);
+            }
+        })();
+    </script>
+
+</body>
+</html>

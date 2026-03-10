@@ -1,0 +1,20 @@
+{
+  "name": "Chick Phobia Chat",
+  "short_name": "chick phobia",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0d0d1a",
+  "theme_color": "#0d0d1a",
+  "icons": [
+    {
+      "src": "public/mipmap-xxxhdpi/ic_launcher.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "public/play_store_512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

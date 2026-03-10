@@ -1,6 +1,4 @@
 import React from 'react'
-import logo from './assets/logo.png'
-import searchImg from './assets/search.png'
 import { initializeApp } from "firebase/app"
 import {
   getFirestore, doc, setDoc, getDoc, onSnapshot, updateDoc,
@@ -54,7 +52,22 @@ const translations = {
     searchUser: "ابحث عن شخص...",
     sent: "تم!",
     deletedMsg: "تم حذف الرسالة",
-    edited: "(متعدلة)"
+    edited: "(متعدلة)",
+    noGroups: "لا توجد مجموعات حالياً",
+    createGroup: "إنشاء مجموعة",
+    selectFriendsHint: "اختار صحابك لإضافتهم:",
+    next: "التالي",
+    selected: "مختار",
+    back: "رجوع",
+    create: "إنشاء",
+    groupName: "اسم المجموعة:",
+    groupNamePlaceholder: "اكتب اسم المجموعة...",
+    groupSettings: "إعدادات المجموعة",
+    groupPassword: "كلمة سر المجموعة",
+    groupPasswordPlaceholder: "عيّن كلمة سر (اختياري)...",
+    saveChanges: "حفظ التغييرات",
+    members: "أعضاء",
+    feedback: "فيدباك"
   },
   en: {
     welcome: "Welcome",
@@ -82,7 +95,22 @@ const translations = {
     searchUser: "Search user...",
     sent: "Sent!",
     deletedMsg: "This message was deleted",
-    edited: "(edited)"
+    edited: "(edited)",
+    noGroups: "No groups yet",
+    createGroup: "Create Group",
+    selectFriendsHint: "Select friends to add:",
+    next: "Next",
+    selected: "selected",
+    back: "Back",
+    create: "Create",
+    groupName: "Group Name",
+    groupNamePlaceholder: "Enter group name...",
+    groupSettings: "Group Settings",
+    groupPassword: "Group Password",
+    groupPasswordPlaceholder: "Set a password (optional)...",
+    saveChanges: "Save Changes",
+    members: "members",
+    feedback: "Feedback"
   }
 }
 
@@ -869,7 +897,7 @@ function App() {
   if (user === undefined) {
     return (
       <div className="all">
-        <img src={logo} className="login-logo pulse" alt="Loading" />
+        <img src={"/res/mipmap-xxxhdpi/ic_launcher.png"} className="login-logo pulse" alt="Loading" />
       </div>
     )
   }
@@ -878,14 +906,14 @@ function App() {
     return (
       <div className="all">
         <div className="login-card">
-          <img src={logo} className="login-logo" alt="Logo" />
+          <img src={"/res/mipmap-xxxhdpi/ic_launcher.png"} className="login-logo" alt="Logo" />
           <h1>Chick Phobia</h1>
           <button
             onClick={() => signInWithPopup(auth, provider)}
             className="mybutton"
             style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}
           >
-            <img src={searchImg} className="btn-icon-beat" alt="" />
+            <img src={"/google.png"} className="btn-icon-beat" alt="" />
             Continue with Google
           </button>
         </div>
@@ -978,12 +1006,25 @@ function App() {
         </button>
         <div className="sidebar-header">
           {user?.photoURL && <img src={user.photoURL} className="avatar-large" alt="User" referrerPolicy="no-referrer" />}
-          <h2 className="nickname-large">{nickname}</h2>
-        </div>
-        <div className="setting-box">
-          <label>{t.changeName}</label>
-          <input className="myinput" value={newNickname} onChange={e => setNewNickname(e.target.value)} />
-          <button onClick={handleUpdateNickname} className="acc-btn-full">{t.save}</button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'center' }}>
+            <h2 className="nickname-large" style={{ margin: 0 }}>{nickname}</h2>
+            {isGoldenUser(nickname) && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+                <span className="material-symbols-outlined golden-badge" style={{ fontSize: '22px' }} title="Early Member">military_tech</span>
+                <div
+                  style={{ position: 'relative', display: 'inline-flex', cursor: 'pointer' }}
+                  onMouseEnter={e => e.currentTarget.querySelector('.badge-tooltip').style.display = 'block'}
+                  onMouseLeave={e => e.currentTarget.querySelector('.badge-tooltip').style.display = 'none'}
+                  onTouchStart={e => { const tip = e.currentTarget.querySelector('.badge-tooltip'); tip.style.display = tip.style.display === 'block' ? 'none' : 'block'; }}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: '15px', color: '#aaa' }}>info</span>
+                  <div className="badge-tooltip" style={{ display: 'none', position: 'absolute', bottom: '120%', left: '50%', transform: 'translateX(-50%)', background: '#222', color: '#fff', padding: '5px 10px', borderRadius: '8px', fontSize: '11px', whiteSpace: 'nowrap', zIndex: 999, pointerEvents: 'none', boxShadow: '0 2px 8px rgba(0,0,0,0.3)' }}>
+                    {language === 'ar' ? 'شارة أول 100 عضو' : 'Top 100 Early Members Badge'}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
         <div className="setting-box">
           <label>{t.language}</label>
@@ -993,15 +1034,27 @@ function App() {
             <span className="lang-text">EN</span>
           </div>
         </div>
-        <button
-          className="logout-btn-sidebar"
-          onClick={() => { set(ref(rtdb, `/status/${nickname}`), { state: 'offline' }); signOut(auth) }}
-        >
-          {t.logout}
-        </button>
+        <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <a
+            href="/feedback/index.html"
+            className="logout-btn-sidebar"
+            style={{ display: 'flex', alignItems: 'center', gap: '8px', textDecoration: 'none', justifyContent: 'center' }}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>feedback</span>
+            {t.feedback}
+          </a>
+          <button
+            className="logout-btn-sidebar"
+            style={{ marginTop: 0 }}
+            onClick={() => { set(ref(rtdb, `/status/${nickname}`), { state: 'offline' }); signOut(auth) }}
+          >
+            {t.logout}
+          </button>
+        </div>
       </div>
 
       <div className="top-bar">
+        
         <button className="menu-btn" onClick={() => setIsFriendsOpen(true)}>
           <span className="material-symbols-outlined">menu</span>
         </button>
@@ -1211,30 +1264,30 @@ function App() {
                       <button className="group-settings-back-btn" onClick={() => setGroupSettingsOpen(false)}>
                         <span className="material-symbols-outlined">arrow_back_ios</span>
                       </button>
-                      <span className="group-settings-title">Group Settings</span>
+                      <span className="group-settings-title">{t.groupSettings}</span>
                     </div>
                     <div className="group-settings-body">
                       <div className="group-settings-field">
-                        <label>Group Name</label>
+                        <label>{t.groupName}</label>
                         <input
                           className="myinput"
                           value={groupSettingName}
                           onChange={e => setGroupSettingName(e.target.value)}
-                          placeholder="Enter group name..."
+                          placeholder={t.groupNamePlaceholder}
                         />
                       </div>
                       <div className="group-settings-field">
-                        <label>Group Password</label>
+                        <label>{t.groupPassword}</label>
                         <input
                           className="myinput"
                           value={groupSettingPassword}
                           onChange={e => setGroupSettingPassword(e.target.value)}
-                          placeholder="Set a password (optional)..."
+                          placeholder={t.groupPasswordPlaceholder}
                           type="text"
                         />
                       </div>
                       <button className="acc-btn-full" onClick={handleSaveGroupSettings}>
-                        Save Changes
+                        {t.saveChanges}
                       </button>
                     </div>
                   </div>
@@ -1253,7 +1306,7 @@ function App() {
                   </div>
                   <div className="chat-top-text">
                     <span className="chat-top-name">{selectedGroup.name}</span>
-                    <span className="chat-top-status">{selectedGroup.members?.length || 0} members</span>
+                    <span className="chat-top-status">{selectedGroup.members?.length || 0} {t.members}</span>
                   </div>
                 </div>
                 <button className="group-dots-btn" onClick={e => { e.stopPropagation(); setGroupSettingsOpen(true) }}>
@@ -1505,18 +1558,18 @@ function App() {
                         </div>
                         <div className="group-item-text">
                           <span className="group-item-name">{g.name}</span>
-                          <span className="group-item-count">{g.members?.length || 0} members</span>
+                          <span className="group-item-count">{g.members?.length || 0} {t.members}</span>
                         </div>
                       </div>
                     </div>
                   ))
-                  : <p className="empty-txt">No groups yet</p>
+                  : <p className="empty-txt">{t.noGroups}</p>
                 }
               </div>
 
               <div className={`add-group-section ${addGroupExpanded ? 'expanded' : ''}`}>
                 <div className="add-group-header">
-                  <span className="add-group-label">Create Group</span>
+                  <span className="add-group-label">{t.createGroup}</span>
                   <button
                     className={`add-group-arrow-btn ${addGroupExpanded ? 'rotated' : ''}`}
                     onClick={() => {
@@ -1535,7 +1588,7 @@ function App() {
                 <div className="add-group-body">
                   {groupCreationStep === 'select' && (
                     <>
-                      <p className="add-group-hint">Select friends to add:</p>
+                      <p className="add-group-hint">{t.selectFriendsHint}</p>
                       <div className="group-member-select-list">
                         {friends.length > 0
                           ? friends.map(f => (
@@ -1565,7 +1618,7 @@ function App() {
                       </div>
                       {selectedMembersForGroup.length > 0 && (
                         <button className="acc-btn-full" style={{ marginTop: '10px' }} onClick={handleCreateGroupProceed}>
-                          Next ({selectedMembersForGroup.length} selected)
+                          {t.next} ({selectedMembersForGroup.length} {t.selected})
                         </button>
                       )}
                     </>
@@ -1573,10 +1626,10 @@ function App() {
 
                   {groupCreationStep === 'name' && (
                     <>
-                      <p className="add-group-hint">Name your group:</p>
+                      <p className="add-group-hint">{t.groupName}:</p>
                       <input
                         className="myinput"
-                        placeholder="Group name..."
+                        placeholder={t.groupNamePlaceholder}
                         value={newGroupName}
                         onChange={e => setNewGroupName(e.target.value)}
                       />
@@ -1586,14 +1639,14 @@ function App() {
                           style={{ flex: 1, padding: '10px' }}
                           onClick={() => setGroupCreationStep('select')}
                         >
-                          Back
+                          {t.back}
                         </button>
                         <button
                           className="acc-btn-full"
                           style={{ flex: 2, marginTop: 0 }}
                           onClick={handleCreateGroupFinalize}
                         >
-                          Create
+                          {t.create}
                         </button>
                       </div>
                     </>
