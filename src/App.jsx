@@ -5,7 +5,8 @@ import {
   deleteField, collection, getDocs, deleteDoc,
   query, orderBy, limit, addDoc, serverTimestamp, startAfter, arrayUnion, arrayRemove
 } from "firebase/firestore"
-import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "firebase/auth"
+import { getAuth, GoogleAuthProvider, signInWithCredential, onAuthStateChanged, signOut } from "firebase/auth"
+import { GoogleAuth } from "@codetrix-studio/capacitor-google-auth"
 import { getDatabase, ref, onValue, onDisconnect, set } from "firebase/database"
 
 const firebaseConfig = {
@@ -23,7 +24,6 @@ const app = initializeApp(firebaseConfig)
 const db = getFirestore(app)
 const rtdb = getDatabase(app)
 const auth = getAuth(app)
-const provider = new GoogleAuthProvider()
 
 const translations = {
   ar: {
@@ -180,6 +180,16 @@ function App() {
   const UPLOAD_PRESET = "chick phobia"
 
   const t = translations[language]
+
+  const signInWithGoogle = async () => {
+    try {
+      const googleUser = await GoogleAuth.signIn()
+      const credential = GoogleAuthProvider.credential(googleUser.authentication.idToken)
+      await signInWithCredential(auth, credential)
+    } catch (err) {
+      console.error("Google Sign-In failed:", err)
+    }
+  }
 
   React.useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (u) => {
@@ -909,7 +919,7 @@ function App() {
           <img src={"/res/mipmap-xxxhdpi/ic_launcher.png"} className="login-logo" alt="Logo" />
           <h1>Chick Phobia</h1>
           <button
-            onClick={() => signInWithPopup(auth, provider)}
+            onClick={signInWithGoogle}
             className="mybutton"
             style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}
           >
@@ -1075,7 +1085,7 @@ function App() {
       </div>
 
       <div className="main-layout">
-        <div className="chat-section">
+        <div className="chat-section chat-card">
           {selectedFriend ? (
             <div
               className={`chat-container${isClosingChat ? ' chat-closing' : ''}`}

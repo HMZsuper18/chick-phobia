@@ -1,0 +1,8 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">chick phobia</string>
+    <string name="title_activity_main">chick phobia</string>
+    <string name="package_name">chick_phobia.hamzah.com</string>
+    <string name="custom_url_scheme">chick_phobia.hamzah.com</string>
+    <string name="server_client_id">465447309915-4bgjc1fipr4769lsv9v7v9m75v0rht0r.apps.googleusercontent.com</string>
+</resources>

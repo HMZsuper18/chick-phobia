@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "465447309915",
+    "firebase_url": "https://chick-phobia-default-rtdb.europe-west1.firebasedatabase.app",
+    "project_id": "chick-phobia",
+    "storage_bucket": "chick-phobia.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:465447309915:android:91247df82c130bc2bf657e",
+        "android_client_info": {
+          "package_name": "chick_phobia.hamzah.com"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "465447309915-0gdflqs9jfm7hfpgbdnvm7fs4t2lgsu8.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "chick_phobia.hamzah.com",
+            "certificate_hash": "40bf0799bef76d04e1071b0b57698aa1bbf4fc56"
+          }
+        },
+        {
+          "client_id": "465447309915-4bgjvplljg3ag84tbg20tp3601tjf1to.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDznZGtNCEa5RdifAYssNHO5Zg7JlvZyDE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "465447309915-4bgjvplljg3ag84tbg20tp3601tjf1to.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
